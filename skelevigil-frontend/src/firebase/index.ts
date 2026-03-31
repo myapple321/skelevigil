@@ -1,0 +1,2 @@
+export { firebaseConfig } from "./firebaseConfig";
+
