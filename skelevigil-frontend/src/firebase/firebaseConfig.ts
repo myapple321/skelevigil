@@ -1,8 +1,7 @@
-// TODO: Replace with your Firebase config values from the Firebase console.
-// Keeping this as a placeholder lets the project compile; it should be filled
-// before enabling real Firebase integration.
+// Web app config from Firebase Console (Project settings).
+// Browser API key after rotation (Google Cloud → Credentials → new Browser key).
 export const firebaseConfig = {
-  apiKey: "AIzaSyB-jvXvzq8X5Y5zrfjGopy008wyQaAnBrU",
+  apiKey: "AIzaSyD38hN_u_vhJJUN63F71Kx3PkxOToLzSys",
   authDomain: "skelevigil.firebaseapp.com",
   projectId: "skelevigil",
   storageBucket: "skelevigil.firebasestorage.app",
