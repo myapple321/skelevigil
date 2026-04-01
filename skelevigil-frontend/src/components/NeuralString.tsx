@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Svg, { G, Path, Rect } from 'react-native-svg';
+import Svg, { G, Rect } from 'react-native-svg';
 import Animated, {
   type SharedValue,
   interpolateColor,
@@ -49,12 +49,11 @@ export function NeuralString() {
   return (
     <View style={styles.anchor}>
       <View style={styles.rotated}>
-        <Svg width={300} height={100} viewBox="0 0 300 100">
-          <Path d="M 50 50 L 250 50" stroke="#00FFFF" strokeWidth={1} opacity={0.35} />
-          <PulseDiamond cx={50} cy={50} x={40} y={40} size={20} phase={0} pulse={pulse} />
-          <PulseDiamond cx={115} cy={50} x={105} y={40} size={20} phase={0.2} pulse={pulse} />
-          <PulseDiamond cx={185} cy={50} x={175} y={40} size={20} phase={0.4} pulse={pulse} />
-          <PulseDiamond cx={250} cy={50} x={240} y={40} size={20} phase={0.6} pulse={pulse} />
+        <Svg width={220} height={100} viewBox="0 0 210 100">
+          <PulseDiamond cx={52} cy={50} x={42} y={40} size={20} phase={0} pulse={pulse} />
+          <PulseDiamond cx={92} cy={50} x={82} y={40} size={20} phase={0.2} pulse={pulse} />
+          <PulseDiamond cx={132} cy={50} x={122} y={40} size={20} phase={0.4} pulse={pulse} />
+          <PulseDiamond cx={172} cy={50} x={162} y={40} size={20} phase={0.6} pulse={pulse} />
         </Svg>
       </View>
     </View>
