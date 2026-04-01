@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   hint: {
-    color: SV.muted,
+    color: 'rgba(240,240,240,0.72)',
     fontSize: 12,
     marginBottom: 20,
   },

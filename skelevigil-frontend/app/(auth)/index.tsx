@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   artHint: {
-    color: SV.muted,
+    color: 'rgba(240,240,240,0.72)',
     fontSize: 11,
     marginTop: 6,
   },

@@ -28,7 +28,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   copy: {
-    color: SV.muted,
+    color: 'rgba(240,240,240,0.88)',
     fontSize: 11,
     textAlign: "center",
   },

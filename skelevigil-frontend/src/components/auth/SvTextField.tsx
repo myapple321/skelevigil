@@ -33,7 +33,7 @@ export function SvTextField({
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={SV.muted}
+          placeholderTextColor={'rgba(240,240,240,0.6)'}
           secureTextEntry={isPasswordField ? isHidden : undefined}
           autoCapitalize={autoCapitalize}
           keyboardType={keyboardType}
