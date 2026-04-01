@@ -18,7 +18,6 @@ export default function LoginLandingScreen() {
         showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>SkeleVigil</Text>
         <Text style={styles.subtitle}>THE ART OF THE IMMUTABLE</Text>
-        <View style={styles.divider} />
         <NeuralString />
         <View style={styles.actions}>
           <SvButton title="Log in with Email" onPress={() => router.push('/(auth)/login-email')} />
@@ -61,18 +60,12 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     marginTop: 10,
+    marginBottom: 24,
     fontSize: 11,
     color: SV.neonCyan,
     textAlign: 'center',
     letterSpacing: 2,
     fontWeight: '600',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: SV.neonCyan,
-    marginTop: 16,
-    marginBottom: 12,
-    opacity: 0.9,
   },
   actions: {
     gap: 14,
