@@ -24,11 +24,6 @@ export default function LoginLandingScreen() {
         </View>
         <View style={styles.actions}>
           <SvButton title="Log in with Email" onPress={() => router.push('/(auth)/login-email')} />
-          <View style={styles.orRow}>
-            <View style={styles.orLine} />
-            <Text style={styles.orText}>OR</Text>
-            <View style={styles.orLine} />
-          </View>
           <SvButton
             variant="secondary"
             title="Log in with Google"
@@ -39,7 +34,7 @@ export default function LoginLandingScreen() {
             variant="secondary"
             title="Log in with Apple"
             onPress={() => {}}
-            icon={<Ionicons name="logo-apple" size={22} color={SV.surgicalWhite} />}
+            icon={<Ionicons name="logo-apple" size={22} color="#FFFFFF" />}
           />
         </View>
         <AuthFooter onHelpPress={() => {}} />
@@ -103,20 +98,5 @@ const styles = StyleSheet.create({
   actions: {
     gap: 14,
     marginBottom: 32,
-  },
-  orRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 4,
-  },
-  orLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(240,240,240,0.2)',
-  },
-  orText: {
-    color: SV.muted,
-    paddingHorizontal: 12,
-    fontSize: 12,
   },
 });
