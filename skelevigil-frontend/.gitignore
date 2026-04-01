@@ -30,8 +30,15 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files (do not commit secrets; use .env.example for keys names only)
+.env
+.env.*
+!.env.example
 .env*.local
+
+# Firebase / Google native config (keep local; download from Firebase Console)
+google-services.json
+GoogleService-Info.plist
 
 # typescript
 *.tsbuildinfo
