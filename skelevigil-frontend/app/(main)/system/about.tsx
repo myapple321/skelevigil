@@ -3,11 +3,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { SV } from '@/src/theme/skelevigil';
 
-export default function SystemScreen() {
+export default function AboutSkeleVigilScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <View style={styles.body}>
-        <Text style={styles.placeholder}>(Settings — task 1a shell)</Text>
+        <Text style={styles.placeholder}>Blank screen (to be implemented)</Text>
       </View>
     </SafeAreaView>
   );
@@ -22,10 +22,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: 20,
   },
   placeholder: {
     color: SV.muted,
     fontSize: 14,
   },
 });
+

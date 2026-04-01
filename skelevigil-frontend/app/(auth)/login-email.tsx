@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Pressable,
   ScrollView,
@@ -14,10 +15,35 @@ import { SvButton } from '@/src/components/auth/SvButton';
 import { SvTextField } from '@/src/components/auth/SvTextField';
 import { SV } from '@/src/theme/skelevigil';
 
+const SAVE_EMAIL_PREF_KEY = 'skelevigil.auth.saveEmail.v1';
+
 export default function LoginEmailScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [saveEmail, setSaveEmail] = useState(true);
+  const [saveEmail, setSaveEmail] = useState(false);
+
+  useEffect(() => {
+    const loadSaveEmailPreference = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(SAVE_EMAIL_PREF_KEY);
+        if (raw === null) return;
+        setSaveEmail(raw === 'true');
+      } catch {
+        // Keep default when storage is unavailable.
+      }
+    };
+    loadSaveEmailPreference();
+  }, []);
+
+  const onToggleSaveEmail = async () => {
+    const nextValue = !saveEmail;
+    setSaveEmail(nextValue);
+    try {
+      await AsyncStorage.setItem(SAVE_EMAIL_PREF_KEY, String(nextValue));
+    } catch {
+      // Keep UI responsive even if write fails.
+    }
+  };
 
   const onLogIn = () => {
     // Task 1b: wire Firebase Auth
@@ -53,7 +79,7 @@ export default function LoginEmailScreen() {
         />
         <Pressable
           style={styles.checkRow}
-          onPress={() => setSaveEmail((v) => !v)}
+          onPress={onToggleSaveEmail}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: saveEmail }}>
           <View style={[styles.box, saveEmail && styles.boxOn]}>

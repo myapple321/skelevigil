@@ -53,6 +53,7 @@ export default function MainLayout() {
         options={{
           title: 'System',
           tabBarLabel: 'System',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings" size={size ?? 24} color={color} />
           ),

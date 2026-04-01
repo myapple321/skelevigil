@@ -1,4 +1,5 @@
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { SV } from '@/src/theme/skelevigil';
 
@@ -21,6 +22,9 @@ export function SvTextField({
   autoCapitalize = "none",
   keyboardType = "default",
 }: Props) {
+  const isPasswordField = Boolean(secureTextEntry);
+  const [isHidden, setIsHidden] = useState(isPasswordField);
+
   return (
     <View style={styles.wrap}>
       <Text style={styles.label}>{label}</Text>
@@ -30,11 +34,16 @@ export function SvTextField({
           onChangeText={onChangeText}
           placeholder={placeholder}
           placeholderTextColor={SV.muted}
-          secureTextEntry={secureTextEntry}
+          secureTextEntry={isPasswordField ? isHidden : undefined}
           autoCapitalize={autoCapitalize}
           keyboardType={keyboardType}
-          style={styles.input}
+          style={[styles.input, isPasswordField && styles.inputWithToggle]}
         />
+        {isPasswordField ? (
+          <Pressable onPress={() => setIsHidden((prev) => !prev)} hitSlop={8}>
+            <Text style={styles.toggle}>{isHidden ? 'Show' : 'Hide'}</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
@@ -57,9 +66,21 @@ const styles = StyleSheet.create({
     borderBottomColor: SV.neonCyan,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   input: {
     color: SV.surgicalWhite,
     fontSize: 16,
+    flex: 1,
+  },
+  inputWithToggle: {
+    marginRight: 12,
+  },
+  toggle: {
+    color: SV.neonCyan,
+    textDecorationLine: 'underline',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
