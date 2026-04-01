@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AuthFooter } from '@/src/components/auth/AuthFooter';
+import { GoogleMarkIcon } from '@/src/components/auth/GoogleMarkIcon';
 import { SvButton } from '@/src/components/auth/SvButton';
 import { SV } from '@/src/theme/skelevigil';
 
@@ -32,7 +33,7 @@ export default function LoginLandingScreen() {
             variant="secondary"
             title="Log in with Google"
             onPress={() => {}}
-            icon={<Ionicons name="logo-google" size={22} color={SV.neonCyan} />}
+            icon={<GoogleMarkIcon size={22} />}
           />
           <SvButton
             variant="secondary"
