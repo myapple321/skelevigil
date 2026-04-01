@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthFooter } from '@/src/components/auth/AuthFooter';
 import { GoogleMarkIcon } from '@/src/components/auth/GoogleMarkIcon';
 import { SvButton } from '@/src/components/auth/SvButton';
+import { NeuralString } from '@/src/components/NeuralString';
 import { SV } from '@/src/theme/skelevigil';
 
 export default function LoginLandingScreen() {
@@ -18,10 +19,7 @@ export default function LoginLandingScreen() {
         <Text style={styles.title}>SkeleVigil</Text>
         <Text style={styles.subtitle}>THE ART OF THE IMMUTABLE</Text>
         <View style={styles.divider} />
-        <View style={styles.artPlaceholder}>
-          <Text style={styles.artLabel}>SkeleVigil-LogIn-ArtWork</Text>
-          <Text style={styles.artHint}>(placeholder)</Text>
-        </View>
+        <NeuralString />
         <View style={styles.actions}>
           <SvButton title="Log in with Email" onPress={() => router.push('/(auth)/login-email')} />
           <SvButton
@@ -73,27 +71,8 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: SV.neonCyan,
     marginTop: 16,
-    marginBottom: 20,
+    marginBottom: 12,
     opacity: 0.9,
-  },
-  artPlaceholder: {
-    minHeight: 140,
-    borderWidth: 1,
-    borderColor: 'rgba(0,255,255,0.25)',
-    borderStyle: 'dashed',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 28,
-  },
-  artLabel: {
-    color: SV.surgicalWhite,
-    fontSize: 13,
-  },
-  artHint: {
-    color: 'rgba(240,240,240,0.72)',
-    fontSize: 11,
-    marginTop: 6,
   },
   actions: {
     gap: 14,
