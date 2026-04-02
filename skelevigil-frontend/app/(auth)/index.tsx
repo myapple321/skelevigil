@@ -112,20 +112,41 @@ export default function LoginLandingScreen() {
         <NeuralString />
         <View style={styles.actions}>
           <SvButton title="Log in with Email" onPress={() => router.push('/(auth)/login-email')} />
-          <SvButton
-            variant="secondary"
-            title="Log in with Google"
-            onPress={() => void onGooglePress()}
-            icon={<GoogleMarkIcon size={22} />}
-            disabled={googleBusy || !request}
-          />
-          {googleError ? <Text style={styles.googleError}>{googleError}</Text> : null}
-          <SvButton
-            variant="secondary"
-            title="Log in with Apple"
-            onPress={() => {}}
-            icon={<Ionicons name="logo-apple" size={22} color="#FFFFFF" />}
-          />
+          {Platform.OS === 'ios' ? (
+            <>
+              <SvButton
+                variant="secondary"
+                title="Log in with Apple"
+                onPress={() => {}}
+                icon={<Ionicons name="logo-apple" size={22} color="#FFFFFF" />}
+              />
+              <SvButton
+                variant="secondary"
+                title="Log in with Google"
+                onPress={() => void onGooglePress()}
+                icon={<GoogleMarkIcon size={22} />}
+                disabled={googleBusy || !request}
+              />
+              {googleError ? <Text style={styles.googleError}>{googleError}</Text> : null}
+            </>
+          ) : (
+            <>
+              <SvButton
+                variant="secondary"
+                title="Log in with Google"
+                onPress={() => void onGooglePress()}
+                icon={<GoogleMarkIcon size={22} />}
+                disabled={googleBusy || !request}
+              />
+              {googleError ? <Text style={styles.googleError}>{googleError}</Text> : null}
+              <SvButton
+                variant="secondary"
+                title="Log in with Apple"
+                onPress={() => {}}
+                icon={<Ionicons name="logo-apple" size={22} color="#FFFFFF" />}
+              />
+            </>
+          )}
         </View>
         <AuthFooter onHelpPress={() => {}} />
       </ScrollView>
