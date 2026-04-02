@@ -1,9 +1,11 @@
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
+import { signOut } from 'firebase/auth';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
 import { SV } from '@/src/theme/skelevigil';
 
 function Row({ title, onPress }: { title: string; onPress: () => void }) {
@@ -35,7 +37,9 @@ export default function SystemIndexScreen() {
 
         <View style={styles.logoutWrap}>
           <Pressable
-            onPress={() => router.replace('/(auth)')}
+            onPress={() => {
+              void signOut(getFirebaseAuth()).then(() => router.replace('/(auth)'));
+            }}
             style={({ pressed }) => [styles.logoutBtn, pressed && styles.logoutPressed]}>
             <FontAwesome6 name="right-from-bracket" size={18} color={SV.mediumOrange} />
             <Text style={styles.logoutText}>Logout</Text>

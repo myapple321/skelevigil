@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -13,26 +14,35 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthFooter } from '@/src/components/auth/AuthFooter';
 import { SvButton } from '@/src/components/auth/SvButton';
 import { SvTextField } from '@/src/components/auth/SvTextField';
+import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
+import { mapAuthErrorMessage } from '@/src/firebase/mapAuthError';
 import { SV } from '@/src/theme/skelevigil';
 
 const SAVE_EMAIL_PREF_KEY = 'skelevigil.auth.saveEmail.v1';
+const SAVED_EMAIL_KEY = 'skelevigil.auth.savedEmail.v1';
 
 export default function LoginEmailScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [saveEmail, setSaveEmail] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadSaveEmailPreference = async () => {
+    const loadPrefs = async () => {
       try {
         const raw = await AsyncStorage.getItem(SAVE_EMAIL_PREF_KEY);
-        if (raw === null) return;
-        setSaveEmail(raw === 'true');
+        const wantsSave = raw === 'true';
+        setSaveEmail(wantsSave);
+        if (wantsSave) {
+          const saved = await AsyncStorage.getItem(SAVED_EMAIL_KEY);
+          if (saved) setEmail(saved);
+        }
       } catch {
-        // Keep default when storage is unavailable.
+        // Keep defaults when storage is unavailable.
       }
     };
-    loadSaveEmailPreference();
+    loadPrefs();
   }, []);
 
   const onToggleSaveEmail = async () => {
@@ -45,9 +55,27 @@ export default function LoginEmailScreen() {
     }
   };
 
-  const onLogIn = () => {
-    // Task 1b: wire Firebase Auth
-    router.replace('/(main)/phases');
+  const onLogIn = async () => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      setErrorMessage('Please enter email and password.');
+      return;
+    }
+    setErrorMessage(null);
+    setBusy(true);
+    try {
+      await signInWithEmailAndPassword(getFirebaseAuth(), trimmedEmail, password);
+      if (saveEmail) {
+        await AsyncStorage.setItem(SAVED_EMAIL_KEY, trimmedEmail);
+      } else {
+        await AsyncStorage.removeItem(SAVED_EMAIL_KEY);
+      }
+      router.replace('/(main)/phases');
+    } catch (e) {
+      setErrorMessage(mapAuthErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -62,7 +90,8 @@ export default function LoginEmailScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Log in with Email</Text>
-        <Text style={styles.hint}>Placeholder — Firebase Auth in task 1b</Text>
+        <Text style={styles.hint}>Sign in with your SkeleVigil account.</Text>
+        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
         <SvTextField
           label="Email Address"
           value={email}
@@ -87,7 +116,12 @@ export default function LoginEmailScreen() {
           </View>
           <Text style={styles.checkLabel}>Save email</Text>
         </Pressable>
-        <SvButton title="Log in" onPress={onLogIn} style={styles.cta} />
+        <SvButton
+          title={busy ? 'Signing in…' : 'Log in'}
+          onPress={() => void onLogIn()}
+          style={styles.cta}
+          disabled={busy}
+        />
         <Pressable style={styles.signUpWrap} onPress={() => router.push('/(auth)/create-account')}>
           <Text style={styles.signUp}>New here? Sign up</Text>
         </Pressable>
@@ -124,7 +158,13 @@ const styles = StyleSheet.create({
   hint: {
     color: 'rgba(240,240,240,0.72)',
     fontSize: 12,
-    marginBottom: 20,
+    marginBottom: 12,
+  },
+  error: {
+    color: '#FF6B6B',
+    fontSize: 14,
+    marginBottom: 16,
+    fontWeight: '600',
   },
   checkRow: {
     flexDirection: 'row',
