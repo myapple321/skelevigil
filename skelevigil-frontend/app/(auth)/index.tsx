@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import * as Google from 'expo-auth-session/providers/google';
 import { signInWithCredential, GoogleAuthProvider } from 'firebase/auth';
@@ -10,6 +11,7 @@ import { AuthFooter } from '@/src/components/auth/AuthFooter';
 import { GoogleMarkIcon } from '@/src/components/auth/GoogleMarkIcon';
 import { SvButton } from '@/src/components/auth/SvButton';
 import { NeuralString } from '@/src/components/NeuralString';
+import { isAppleAuthUserCanceled, signInWithAppleForFirebase } from '@/src/firebase/appleAuth';
 import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
 import { mapAuthErrorMessage } from '@/src/firebase/mapAuthError';
 import { SV } from '@/src/theme/skelevigil';
@@ -29,6 +31,9 @@ const GOOGLE_IOS_REDIRECT_URI_OPTIONS =
 export default function LoginLandingScreen() {
   const [googleBusy, setGoogleBusy] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
+  const [appleBusy, setAppleBusy] = useState(false);
+  const [appleError, setAppleError] = useState<string | null>(null);
+  const [appleAvailable, setAppleAvailable] = useState(false);
 
   const webId = GOOGLE_OAUTH_CLIENT_IDS.webClientId;
   const iosId = GOOGLE_OAUTH_CLIENT_IDS.iosClientId;
@@ -45,6 +50,13 @@ export default function LoginLandingScreen() {
     },
     GOOGLE_IOS_REDIRECT_URI_OPTIONS,
   );
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') {
+      return;
+    }
+    void AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
+  }, []);
 
   useEffect(() => {
     const handleResponse = async () => {
@@ -101,6 +113,27 @@ export default function LoginLandingScreen() {
     }
   };
 
+  const onApplePress = async () => {
+    setAppleError(null);
+    if (Platform.OS !== 'ios' || !appleAvailable) {
+      return;
+    }
+
+    setAppleBusy(true);
+    try {
+      await signInWithAppleForFirebase(getFirebaseAuth());
+      router.replace('/(main)/phases');
+    } catch (e) {
+      if (isAppleAuthUserCanceled(e)) {
+        setAppleError(null);
+      } else {
+        setAppleError(mapAuthErrorMessage(e));
+      }
+    } finally {
+      setAppleBusy(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <ScrollView
@@ -117,17 +150,19 @@ export default function LoginLandingScreen() {
               <SvButton
                 variant="secondary"
                 title="Log in with Apple"
-                onPress={() => {}}
+                onPress={() => void onApplePress()}
                 icon={<Ionicons name="logo-apple" size={22} color="#FFFFFF" />}
+                disabled={appleBusy || !appleAvailable}
               />
+              {appleError ? <Text style={styles.oauthError}>{appleError}</Text> : null}
               <SvButton
                 variant="secondary"
                 title="Log in with Google"
                 onPress={() => void onGooglePress()}
                 icon={<GoogleMarkIcon size={22} />}
-                disabled={googleBusy || !request}
+                disabled={googleBusy || !request || appleBusy}
               />
-              {googleError ? <Text style={styles.googleError}>{googleError}</Text> : null}
+              {googleError ? <Text style={styles.oauthError}>{googleError}</Text> : null}
             </>
           ) : (
             <>
@@ -138,13 +173,7 @@ export default function LoginLandingScreen() {
                 icon={<GoogleMarkIcon size={22} />}
                 disabled={googleBusy || !request}
               />
-              {googleError ? <Text style={styles.googleError}>{googleError}</Text> : null}
-              <SvButton
-                variant="secondary"
-                title="Log in with Apple"
-                onPress={() => {}}
-                icon={<Ionicons name="logo-apple" size={22} color="#FFFFFF" />}
-              />
+              {googleError ? <Text style={styles.oauthError}>{googleError}</Text> : null}
             </>
           )}
         </View>
@@ -185,7 +214,7 @@ const styles = StyleSheet.create({
     gap: 14,
     marginBottom: 32,
   },
-  googleError: {
+  oauthError: {
     color: '#FF6B6B',
     fontSize: 13,
     fontWeight: '600',
