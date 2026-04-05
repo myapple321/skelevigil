@@ -23,12 +23,23 @@ const SAVE_EMAIL_PREF_KEY = 'skelevigil.auth.saveEmail.v1';
 const SAVED_EMAIL_KEY = 'skelevigil.auth.savedEmail.v1';
 
 /**
- * Shown when password fails; Firebase often hides sign-in methods (enumeration protection).
- * Google-only users never see the “link password” modal on the login screen—that modal only
- * appears when Google conflicts with an existing email/password account (see index.tsx).
+ * Appended after a wrong-password style error when Google may be the right sign-in method.
+ * (Firebase may hide exact methods; see fetchSignInMethodsForEmail in onLogIn.)
  */
 const GOOGLE_LINK_HINT =
-  '\n\nIf you use Google for this email: go back and use Log in with Google. Google-only accounts are not followed by a password “link” step in this app; that step only runs when Google conflicts with an existing password account.';
+  '\n\nTip: If you usually sign in with Google for this email, go back and tap Log in with Google.';
+
+function splitErrorParagraphs(message: string): { primary: string; detail?: string } {
+  const chunks = message
+    .split(/\n\n/)
+    .map((c) => c.trim())
+    .filter(Boolean);
+  if (chunks.length >= 2) {
+    return { primary: chunks[0], detail: chunks.slice(1).join('\n\n') };
+  }
+  const single = message.trim();
+  return { primary: single };
+}
 
 export default function LoginEmailScreen() {
   const [email, setEmail] = useState('');
@@ -95,7 +106,7 @@ export default function LoginEmailScreen() {
           const methods = await fetchSignInMethodsForEmail(getFirebaseAuth(), trimmedEmail);
           if (methods.length === 1 && methods[0] === 'google.com') {
             msg =
-              'This email is Google sign-in only—no password is stored for it, so this screen cannot log you in. Go back and use Log in with Google. You will not be asked for a password to “link” after Google for this kind of account; that prompt only appears when an email/password account already exists and you add Google.';
+              'This email is set up for Google sign-in, not a password on this screen. Go back and tap Log in with Google.';
           } else if (
             methods.length === 0 ||
             methods.includes('google.com')
@@ -113,6 +124,10 @@ export default function LoginEmailScreen() {
     }
   };
 
+  const errorParts = errorMessage ? splitErrorParagraphs(errorMessage) : null;
+  const longSingleBlock =
+    errorParts !== null && !errorParts.detail && errorParts.primary.length > 120;
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.topBar}>
@@ -126,7 +141,20 @@ export default function LoginEmailScreen() {
         showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Log in with Email</Text>
         <Text style={styles.hint}>Sign in with your SkeleVigil account.</Text>
-        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+        {errorParts ? (
+          <View style={styles.errorBanner} accessibilityRole="alert">
+            <Text
+              style={longSingleBlock ? styles.errorDetail : styles.errorPrimary}
+              maxFontSizeMultiplier={1.35}>
+              {errorParts.primary}
+            </Text>
+            {errorParts.detail ? (
+              <Text style={styles.errorDetail} maxFontSizeMultiplier={1.35}>
+                {errorParts.detail}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
         <SvTextField
           label="Email Address"
           value={email}
@@ -195,13 +223,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 12,
   },
-  error: {
-    color: '#FF6B6B',
-    fontSize: 14,
-    lineHeight: 20,
+  errorBanner: {
     marginBottom: 16,
-    fontWeight: '600',
-    textAlign: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 214, 120, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 210, 100, 0.42)',
+  },
+  errorPrimary: {
+    color: '#FFF4D6',
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '700',
+    textAlign: 'left',
+  },
+  errorDetail: {
+    marginTop: 10,
+    color: 'rgba(248, 248, 248, 0.94)',
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: '500',
+    textAlign: 'left',
   },
   checkRow: {
     flexDirection: 'row',
