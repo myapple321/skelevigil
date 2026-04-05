@@ -140,7 +140,6 @@ export default function LoginEmailScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Log in with Email</Text>
-        <Text style={styles.hint}>Sign in with your SkeleVigil account.</Text>
         {errorParts ? (
           <View style={styles.errorBanner} accessibilityRole="alert">
             <Text
@@ -215,13 +214,8 @@ const styles = StyleSheet.create({
     fontFamily: 'SpaceMono',
     fontSize: 20,
     color: SV.surgicalWhite,
-    marginBottom: 8,
+    marginBottom: 20,
     letterSpacing: 1,
-  },
-  hint: {
-    color: 'rgba(240,240,240,0.72)',
-    fontSize: 12,
-    marginBottom: 12,
   },
   errorBanner: {
     marginBottom: 16,
