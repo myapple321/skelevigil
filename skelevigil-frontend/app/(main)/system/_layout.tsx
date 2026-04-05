@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 
+import { SvHeaderBack } from '@/src/components/SvHeaderBack';
 import { SV } from '@/src/theme/skelevigil';
 
 export default function SystemLayout() {
@@ -13,8 +14,22 @@ export default function SystemLayout() {
       }}>
       <Stack.Screen name="index" options={{ title: 'System' }} />
       <Stack.Screen name="profile" options={{ title: 'My Profile' }} />
-      <Stack.Screen name="help" options={{ title: 'Help & Questions' }} />
-      <Stack.Screen name="about" options={{ title: 'About SkeleVigil' }} />
+      <Stack.Screen
+        name="help"
+        options={{
+          title: 'Help & Questions',
+          headerBackTitleVisible: false,
+          headerLeft: () => <SvHeaderBack />,
+        }}
+      />
+      <Stack.Screen
+        name="about"
+        options={{
+          title: 'About SkeleVigil',
+          headerBackTitleVisible: false,
+          headerLeft: () => <SvHeaderBack />,
+        }}
+      />
     </Stack>
   );
 }
