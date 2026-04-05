@@ -93,6 +93,7 @@ export default function LoginLandingScreen() {
 
   const onGooglePress = async () => {
     setGoogleError(null);
+    if (appleBusy) return;
 
     if (!GOOGLE_OAUTH_CLIENT_IDS.webClientId) {
       setGoogleError('Missing Google web client ID. Update src/firebase/googleOAuthClientIds.ts.');
@@ -115,7 +116,7 @@ export default function LoginLandingScreen() {
 
   const onApplePress = async () => {
     setAppleError(null);
-    if (Platform.OS !== 'ios' || !appleAvailable) {
+    if (Platform.OS !== 'ios' || !appleAvailable || googleBusy) {
       return;
     }
 
@@ -160,7 +161,7 @@ export default function LoginLandingScreen() {
                 title="Log in with Google"
                 onPress={() => void onGooglePress()}
                 icon={<GoogleMarkIcon size={22} />}
-                disabled={googleBusy || !request || appleBusy}
+                disabled={googleBusy || !request}
               />
               {googleError ? <Text style={styles.oauthError}>{googleError}</Text> : null}
             </>
