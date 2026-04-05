@@ -10,9 +10,9 @@ export function mapAuthErrorMessage(error: unknown): string {
       case 'auth/user-not-found':
         return 'No account found for this email.';
       case 'auth/wrong-password':
-        return 'Incorrect password.';
+        return 'Wrong email or password.';
       case 'auth/invalid-credential':
-        return 'Email or password is incorrect.';
+        return 'Wrong email or password.';
       case 'auth/too-many-requests':
         return 'Too many attempts. Please wait a moment and try again.';
       case 'auth/network-request-failed':

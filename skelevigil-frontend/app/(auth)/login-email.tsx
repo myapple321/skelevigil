@@ -23,8 +23,7 @@ const SAVE_EMAIL_PREF_KEY = 'skelevigil.auth.saveEmail.v1';
 const SAVED_EMAIL_KEY = 'skelevigil.auth.savedEmail.v1';
 
 /**
- * Appended after a wrong-password style error when Google may be the right sign-in method.
- * (Firebase may hide exact methods; see fetchSignInMethodsForEmail in onLogIn.)
+ * Only when this email has Google linked but no password provider (unusual); Google-only uses a full message below.
  */
 const GOOGLE_LINK_HINT =
   '\n\nTip: If you usually sign in with Google for this email, go back and tap Log in with Google.';
@@ -104,17 +103,19 @@ export default function LoginEmailScreen() {
       if (authCode === 'auth/invalid-credential' || authCode === 'auth/wrong-password') {
         try {
           const methods = await fetchSignInMethodsForEmail(getFirebaseAuth(), trimmedEmail);
+          const hasPassword = methods.includes('password');
+
           if (methods.length === 1 && methods[0] === 'google.com') {
             msg =
               'This email is set up for Google sign-in, not a password on this screen. Go back and tap Log in with Google.';
-          } else if (
-            methods.length === 0 ||
-            methods.includes('google.com')
-          ) {
+          } else if (methods.length === 1 && methods[0] === 'apple.com') {
+            msg =
+              'This email is set up for Apple sign-in, not a password on this screen. Go back and tap Log in with Apple.';
+          } else if (!hasPassword && methods.includes('google.com')) {
             msg += GOOGLE_LINK_HINT;
           }
         } catch {
-          msg += GOOGLE_LINK_HINT;
+          // Keep generic wrong-credentials message if sign-in methods cannot be loaded.
         }
       }
 

@@ -203,6 +203,12 @@ export default function SystemIndexScreen() {
         <Text style={styles.sectionTitle}>Sign In & Security</Text>
         <View style={styles.card}>
           <Row
+            title="Change Password"
+            iconName="key-outline"
+            onPress={() => router.push('/(main)/system/change-password')}
+          />
+          <View style={styles.divider} />
+          <Row
             title="Delete Account"
             iconName="trash-outline"
             onPress={() => {

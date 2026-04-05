@@ -15,6 +15,14 @@ export default function SystemLayout() {
       <Stack.Screen name="index" options={{ title: 'System' }} />
       <Stack.Screen name="profile" options={{ title: 'My Profile' }} />
       <Stack.Screen
+        name="change-password"
+        options={{
+          title: 'Change Password',
+          headerBackTitleVisible: false,
+          headerLeft: () => <SvHeaderBack />,
+        }}
+      />
+      <Stack.Screen
         name="help"
         options={{
           title: 'Help & Questions',
