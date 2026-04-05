@@ -145,7 +145,11 @@ export default function LoginLandingScreen() {
         <Text style={styles.subtitle}>THE ART OF THE IMMUTABLE</Text>
         <NeuralString />
         <View style={styles.actions}>
-          <SvButton title="Log in with Email" onPress={() => router.push('/(auth)/login-email')} />
+          <SvButton
+            title="Log in with Email"
+            onPress={() => router.push('/(auth)/login-email')}
+            icon={<Ionicons name="mail" size={22} color={SV.black} />}
+          />
           {Platform.OS === 'ios' ? (
             <>
               <SvButton
