@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { FirebaseError } from 'firebase/app';
+import { fetchSignInMethodsForEmail, signInWithEmailAndPassword } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -20,6 +21,14 @@ import { SV } from '@/src/theme/skelevigil';
 
 const SAVE_EMAIL_PREF_KEY = 'skelevigil.auth.saveEmail.v1';
 const SAVED_EMAIL_KEY = 'skelevigil.auth.savedEmail.v1';
+
+/**
+ * Shown when password fails; Firebase often hides sign-in methods (enumeration protection).
+ * Google-only users never see the “link password” modal on the login screen—that modal only
+ * appears when Google conflicts with an existing email/password account (see index.tsx).
+ */
+const GOOGLE_LINK_HINT =
+  '\n\nIf you use Google for this email: go back and use Log in with Google. Google-only accounts are not followed by a password “link” step in this app; that step only runs when Google conflicts with an existing password account.';
 
 export default function LoginEmailScreen() {
   const [email, setEmail] = useState('');
@@ -72,7 +81,33 @@ export default function LoginEmailScreen() {
       }
       router.replace('/(main)/phases');
     } catch (e) {
-      setErrorMessage(mapAuthErrorMessage(e));
+      const authCode =
+        e instanceof FirebaseError
+          ? e.code
+          : typeof e === 'object' && e !== null && 'code' in e
+            ? String((e as { code: unknown }).code)
+            : null;
+
+      let msg = mapAuthErrorMessage(e);
+
+      if (authCode === 'auth/invalid-credential' || authCode === 'auth/wrong-password') {
+        try {
+          const methods = await fetchSignInMethodsForEmail(getFirebaseAuth(), trimmedEmail);
+          if (methods.length === 1 && methods[0] === 'google.com') {
+            msg =
+              'This email is Google sign-in only—no password is stored for it, so this screen cannot log you in. Go back and use Log in with Google. You will not be asked for a password to “link” after Google for this kind of account; that prompt only appears when an email/password account already exists and you add Google.';
+          } else if (
+            methods.length === 0 ||
+            methods.includes('google.com')
+          ) {
+            msg += GOOGLE_LINK_HINT;
+          }
+        } catch {
+          msg += GOOGLE_LINK_HINT;
+        }
+      }
+
+      setErrorMessage(msg);
     } finally {
       setBusy(false);
     }
@@ -163,8 +198,10 @@ const styles = StyleSheet.create({
   error: {
     color: '#FF6B6B',
     fontSize: 14,
+    lineHeight: 20,
     marginBottom: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
   checkRow: {
     flexDirection: 'row',

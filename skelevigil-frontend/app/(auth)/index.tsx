@@ -2,14 +2,22 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import * as Google from 'expo-auth-session/providers/google';
-import { signInWithCredential, GoogleAuthProvider } from 'firebase/auth';
-import { useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FirebaseError } from 'firebase/app';
+import {
+  GoogleAuthProvider,
+  linkWithCredential,
+  signInWithCredential,
+  signInWithEmailAndPassword,
+  type AuthCredential,
+} from 'firebase/auth';
+import { useEffect, useRef, useState } from 'react';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AuthFooter } from '@/src/components/auth/AuthFooter';
 import { GoogleMarkIcon } from '@/src/components/auth/GoogleMarkIcon';
 import { SvButton } from '@/src/components/auth/SvButton';
+import { SvTextField } from '@/src/components/auth/SvTextField';
 import { NeuralString } from '@/src/components/NeuralString';
 import { isAppleAuthUserCanceled, signInWithAppleForFirebase } from '@/src/firebase/appleAuth';
 import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
@@ -34,6 +42,13 @@ export default function LoginLandingScreen() {
   const [appleBusy, setAppleBusy] = useState(false);
   const [appleError, setAppleError] = useState<string | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
+
+  const [googleLinkOpen, setGoogleLinkOpen] = useState(false);
+  const [googleLinkEmail, setGoogleLinkEmail] = useState('');
+  const [googleLinkPassword, setGoogleLinkPassword] = useState('');
+  const [googleLinkError, setGoogleLinkError] = useState<string | null>(null);
+  const [googleLinkBusy, setGoogleLinkBusy] = useState(false);
+  const pendingGoogleLinkCredRef = useRef<AuthCredential | null>(null);
 
   const webId = GOOGLE_OAUTH_CLIENT_IDS.webClientId;
   const iosId = GOOGLE_OAUTH_CLIENT_IDS.iosClientId;
@@ -75,7 +90,25 @@ export default function LoginLandingScreen() {
           await signInWithCredential(getFirebaseAuth(), credential);
           router.replace('/(main)/phases');
         } catch (e) {
-          setGoogleError(mapAuthErrorMessage(e));
+          if (
+            e instanceof FirebaseError &&
+            e.code === 'auth/account-exists-with-different-credential'
+          ) {
+            const pending = GoogleAuthProvider.credentialFromError(e);
+            const email = e.customData?.email as string | undefined;
+            if (pending && email) {
+              pendingGoogleLinkCredRef.current = pending;
+              setGoogleLinkEmail(email);
+              setGoogleLinkPassword('');
+              setGoogleLinkError(null);
+              setGoogleLinkOpen(true);
+              setGoogleError(null);
+            } else {
+              setGoogleError(mapAuthErrorMessage(e));
+            }
+          } else {
+            setGoogleError(mapAuthErrorMessage(e));
+          }
         } finally {
           setGoogleBusy(false);
         }
@@ -135,8 +168,80 @@ export default function LoginLandingScreen() {
     }
   };
 
+  const closeGoogleLinkModal = () => {
+    pendingGoogleLinkCredRef.current = null;
+    setGoogleLinkOpen(false);
+    setGoogleLinkPassword('');
+    setGoogleLinkError(null);
+  };
+
+  const onConfirmGoogleLink = async () => {
+    const pwd = googleLinkPassword;
+    if (!pwd) {
+      setGoogleLinkError('Enter your SkeleVigil password to link Google sign-in.');
+      return;
+    }
+    const pending = pendingGoogleLinkCredRef.current;
+    if (!pending) {
+      setGoogleLinkError('Sign-in expired. Try Log in with Google again.');
+      return;
+    }
+
+    setGoogleLinkError(null);
+    setGoogleLinkBusy(true);
+    try {
+      const auth = getFirebaseAuth();
+      await signInWithEmailAndPassword(auth, googleLinkEmail.trim(), pwd);
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('No user after sign-in.');
+      }
+      await linkWithCredential(user, pending);
+      pendingGoogleLinkCredRef.current = null;
+      setGoogleLinkOpen(false);
+      setGoogleLinkPassword('');
+      router.replace('/(main)/phases');
+    } catch (err) {
+      setGoogleLinkError(mapAuthErrorMessage(err));
+    } finally {
+      setGoogleLinkBusy(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <Modal
+        visible={googleLinkOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={closeGoogleLinkModal}>
+        <Pressable style={styles.modalBackdrop} onPress={closeGoogleLinkModal}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Link Google to your account</Text>
+            <Text style={styles.modalBody}>
+              An account already exists for {googleLinkEmail || 'this email'} with email and password.
+              Enter that password once to link Google sign-in to the same account.
+            </Text>
+            <SvTextField
+              label="Password"
+              value={googleLinkPassword}
+              onChangeText={setGoogleLinkPassword}
+              placeholder="Your SkeleVigil password"
+              secureTextEntry
+            />
+            {googleLinkError ? <Text style={styles.modalErr}>{googleLinkError}</Text> : null}
+            <SvButton
+              title={googleLinkBusy ? 'Linking…' : 'Link and continue'}
+              onPress={() => void onConfirmGoogleLink()}
+              disabled={googleLinkBusy}
+              style={styles.modalPrimary}
+            />
+            <Pressable onPress={closeGoogleLinkModal} style={styles.modalCancelWrap}>
+              <Text style={styles.modalCancel}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
@@ -226,5 +331,50 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 6,
     marginBottom: 2,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    backgroundColor: SV.gunmetal,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,255,0.35)',
+    padding: 20,
+  },
+  modalTitle: {
+    color: SV.surgicalWhite,
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  modalBody: {
+    color: 'rgba(240,240,240,0.85)',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  modalErr: {
+    color: '#FF6B6B',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  modalPrimary: {
+    marginTop: 8,
+  },
+  modalCancelWrap: {
+    alignItems: 'center',
+    marginTop: 14,
+    paddingVertical: 8,
+  },
+  modalCancel: {
+    color: SV.neonCyan,
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

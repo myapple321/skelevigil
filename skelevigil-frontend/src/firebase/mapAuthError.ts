@@ -23,6 +23,8 @@ export function mapAuthErrorMessage(error: unknown): string {
         return 'Password should be at least 6 characters.';
       case 'auth/operation-not-allowed':
         return 'Email sign-in is not enabled for this project.';
+      case 'auth/account-exists-with-different-credential':
+        return 'An account already exists with this email using another sign-in method. Use that method, or complete linking when prompted.';
       default:
         return error.message || 'Something went wrong. Please try again.';
     }
