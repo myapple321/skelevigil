@@ -25,6 +25,8 @@ export function mapAuthErrorMessage(error: unknown): string {
         return 'Email sign-in is not enabled for this project.';
       case 'auth/account-exists-with-different-credential':
         return 'An account already exists with this email using another sign-in method. Use that method, or complete linking when prompted.';
+      case 'auth/requires-recent-login':
+        return 'For your security, sign out and sign in again, then try this action once more.';
       default:
         return error.message || 'Something went wrong. Please try again.';
     }
