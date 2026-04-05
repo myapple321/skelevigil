@@ -3,6 +3,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { FirebaseError } from 'firebase/app';
 import { router } from 'expo-router';
 import { deleteUser, signOut, type User } from 'firebase/auth';
+import type { ComponentProps } from 'react';
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -46,12 +47,25 @@ function deleteModalAccountSummary(user: User): { emailDisplay: string; methodsL
   return { emailDisplay, methodsLabel };
 }
 
-function Row({ title, onPress }: { title: string; onPress: () => void }) {
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
+
+function Row({
+  title,
+  onPress,
+  iconName,
+}: {
+  title: string;
+  onPress: () => void;
+  iconName: IoniconName;
+}) {
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-      <Text style={styles.rowTitle}>{title}</Text>
+      <View style={styles.rowMain}>
+        <Ionicons name={iconName} size={22} color={SV.neonCyan} style={styles.rowIcon} />
+        <Text style={styles.rowTitle}>{title}</Text>
+      </View>
       <Ionicons name="chevron-forward" size={18} color={SV.muted} />
     </Pressable>
   );
@@ -179,13 +193,18 @@ export default function SystemIndexScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionTitle}>My Account</Text>
         <View style={styles.card}>
-          <Row title="My Profile" onPress={() => router.push('/(main)/system/profile')} />
+          <Row
+            title="My Profile"
+            iconName="person-circle-outline"
+            onPress={() => router.push('/(main)/system/profile')}
+          />
         </View>
 
         <Text style={styles.sectionTitle}>Sign In & Security</Text>
         <View style={styles.card}>
           <Row
             title="Delete Account"
+            iconName="trash-outline"
             onPress={() => {
               setDeleteError(null);
               setDeleteNeedsRecentSignIn(false);
@@ -196,9 +215,17 @@ export default function SystemIndexScreen() {
 
         <Text style={styles.sectionTitle}>Support</Text>
         <View style={styles.card}>
-          <Row title="Help & Questions" onPress={() => router.push('/(main)/system/help')} />
+          <Row
+            title="Help & Questions"
+            iconName="help-circle-outline"
+            onPress={() => router.push('/(main)/system/help')}
+          />
           <View style={styles.divider} />
-          <Row title="About SkeleVigil" onPress={() => router.push('/(main)/system/about')} />
+          <Row
+            title="About SkeleVigil"
+            iconName="information-circle-outline"
+            onPress={() => router.push('/(main)/system/about')}
+          />
         </View>
 
         <View style={styles.logoutWrap}>
@@ -247,11 +274,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 12,
+  },
+  rowMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minWidth: 0,
+  },
+  rowIcon: {
+    marginTop: 1,
   },
   rowPressed: {
     backgroundColor: 'rgba(0,255,255,0.06)',
   },
   rowTitle: {
+    flex: 1,
     color: SV.surgicalWhite,
     fontSize: 16,
     fontWeight: '600',
@@ -259,7 +298,7 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: 'rgba(0,255,255,0.12)',
-    marginLeft: 16,
+    marginLeft: 16 + 22 + 12,
   },
   logoutWrap: {
     marginTop: 26,
