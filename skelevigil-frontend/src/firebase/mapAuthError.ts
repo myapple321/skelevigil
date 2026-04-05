@@ -18,7 +18,7 @@ export function mapAuthErrorMessage(error: unknown): string {
       case 'auth/network-request-failed':
         return 'Network error. Check your connection and try again.';
       case 'auth/email-already-in-use':
-        return 'An account already exists with this email.';
+        return 'You already have an account with this email.\n\nGo back and use Log in with Email, or sign in with Google or Apple if you use those.';
       case 'auth/weak-password':
         return 'Password should be at least 6 characters.';
       case 'auth/operation-not-allowed':

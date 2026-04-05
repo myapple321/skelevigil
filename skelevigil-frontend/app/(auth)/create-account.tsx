@@ -9,6 +9,7 @@ import { SvButton } from '@/src/components/auth/SvButton';
 import { SvTextField } from '@/src/components/auth/SvTextField';
 import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
 import { mapAuthErrorMessage } from '@/src/firebase/mapAuthError';
+import { splitErrorParagraphs } from '@/src/firebase/splitErrorParagraphs';
 import { SV } from '@/src/theme/skelevigil';
 
 export default function CreateAccountScreen() {
@@ -39,6 +40,10 @@ export default function CreateAccountScreen() {
     }
   };
 
+  const errorParts = errorMessage ? splitErrorParagraphs(errorMessage) : null;
+  const longSingleBlock =
+    errorParts !== null && !errorParts.detail && errorParts.primary.length > 120;
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.topBar}>
@@ -52,7 +57,20 @@ export default function CreateAccountScreen() {
         showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Create Account</Text>
         <Text style={styles.hint}>Use at least 6 characters for your password.</Text>
-        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+        {errorParts ? (
+          <View style={styles.errorBanner} accessibilityRole="alert">
+            <Text
+              style={longSingleBlock ? styles.errorDetail : styles.errorPrimary}
+              maxFontSizeMultiplier={1.35}>
+              {errorParts.primary}
+            </Text>
+            {errorParts.detail ? (
+              <Text style={styles.errorDetail} maxFontSizeMultiplier={1.35}>
+                {errorParts.detail}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
         <SvTextField
           label="Email Address"
           value={email}
@@ -108,11 +126,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 12,
   },
-  error: {
-    color: '#FF6B6B',
-    fontSize: 14,
+  errorBanner: {
     marginBottom: 16,
-    fontWeight: '600',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 214, 120, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 210, 100, 0.42)',
+  },
+  errorPrimary: {
+    color: '#FFF4D6',
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '700',
+    textAlign: 'left',
+  },
+  errorDetail: {
+    marginTop: 10,
+    color: 'rgba(248, 248, 248, 0.94)',
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: '500',
+    textAlign: 'left',
   },
   cta: {
     marginTop: 8,

@@ -17,6 +17,7 @@ import { SvButton } from '@/src/components/auth/SvButton';
 import { SvTextField } from '@/src/components/auth/SvTextField';
 import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
 import { mapAuthErrorMessage } from '@/src/firebase/mapAuthError';
+import { splitErrorParagraphs } from '@/src/firebase/splitErrorParagraphs';
 import { SV } from '@/src/theme/skelevigil';
 
 const SAVE_EMAIL_PREF_KEY = 'skelevigil.auth.saveEmail.v1';
@@ -27,18 +28,6 @@ const SAVED_EMAIL_KEY = 'skelevigil.auth.savedEmail.v1';
  */
 const GOOGLE_LINK_HINT =
   '\n\nTip: If you usually sign in with Google for this email, go back and tap Log in with Google.';
-
-function splitErrorParagraphs(message: string): { primary: string; detail?: string } {
-  const chunks = message
-    .split(/\n\n/)
-    .map((c) => c.trim())
-    .filter(Boolean);
-  if (chunks.length >= 2) {
-    return { primary: chunks[0], detail: chunks.slice(1).join('\n\n') };
-  }
-  const single = message.trim();
-  return { primary: single };
-}
 
 export default function LoginEmailScreen() {
   const [email, setEmail] = useState('');
@@ -186,7 +175,7 @@ export default function LoginEmailScreen() {
           disabled={busy}
         />
         <Pressable style={styles.signUpWrap} onPress={() => router.push('/(auth)/create-account')}>
-          <Text style={styles.signUp}>New here? Sign up</Text>
+          <Text style={styles.signUp}>Create an account</Text>
         </Pressable>
         <AuthFooter onHelpPress={() => {}} />
       </ScrollView>
