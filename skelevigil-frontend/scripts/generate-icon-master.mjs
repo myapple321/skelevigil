@@ -26,7 +26,7 @@ function main() {
   fs.mkdirSync(outDir, { recursive: true });
 
   const resvg = new Resvg(svg, {
-    background: '#0D0D0D',
+    background: '#000000',
     fitTo: {
       mode: 'width',
       width: 1024,

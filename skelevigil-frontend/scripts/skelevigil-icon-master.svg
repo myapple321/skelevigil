@@ -1,37 +1,39 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- SkeleVigil app icon: 1024x1024, 100px safe. #0D0D0D bg. Frame: dim bracket (spec #121212 too close to bg at icon size—use #2A2A2A for legibility). -->
+<!-- SkeleVigil master 1024x1024, opaque black, no rounded corners. Guardian '[' + 45deg strand, group centered. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <rect width="1024" height="1024" fill="#0D0D0D" />
-  <!-- Thick geometric C-bracket (Guardian-style), opening toward strand -->
-  <path
-    d="M 304 184 L 126 184 L 126 840 L 304 840"
-    fill="none"
-    stroke="#2A2A2A"
-    stroke-width="44"
-    stroke-linecap="square"
-    stroke-linejoin="miter"
-    stroke-miterlimit="8" />
-  <!-- Filament: 6px, dimmer cyan (pulse trail) -->
-  <polyline
-    fill="none"
-    stroke="#00AAAA"
-    stroke-width="6"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    points="386.94,637.06 470.31,553.69 553.69,470.31 637.06,386.94" />
-  <!-- Diamonds: BL to TR; top-right = bright #00FFFF, others #00AAAA -->
-  <g stroke="none">
-    <g transform="translate(386.942 637.058) rotate(45)">
-      <rect x="-27" y="-27" width="54" height="54" fill="#00AAAA" />
-    </g>
-    <g transform="translate(470.314 553.686) rotate(45)">
-      <rect x="-27" y="-27" width="54" height="54" fill="#00AAAA" />
-    </g>
-    <g transform="translate(553.686 470.314) rotate(45)">
-      <rect x="-27" y="-27" width="54" height="54" fill="#00AAAA" />
-    </g>
-    <g transform="translate(637.058 386.942) rotate(45)">
-      <rect x="-27" y="-27" width="54" height="54" fill="#00FFFF" />
+  <rect width="1024" height="1024" fill="#000000" />
+  <g transform="translate(93 0)">
+    <!-- Clean vertical '[' bracket; gunmetal #1A1A1B; span matches strand y=349-675 -->
+    <path
+      d="M 298 349 L 186 349 L 186 675 L 298 675"
+      fill="none"
+      stroke="#1A1A1B"
+      stroke-width="44"
+      stroke-linecap="square"
+      stroke-linejoin="miter"
+      stroke-miterlimit="8" />
+    <!-- Filament 8px between diamond centers -->
+    <polyline
+      fill="none"
+      stroke="#00BBBB"
+      stroke-width="8"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      points="386.94,637.06 470.31,553.69 553.69,470.31 637.06,386.94" />
+    <!-- BL to TR: solid fills, -15% brightness per step (TR 100% .. BL 55%) -->
+    <g stroke="none">
+      <g transform="translate(386.942 637.058) rotate(45)">
+        <rect x="-27" y="-27" width="54" height="54" fill="#008C8C" />
+      </g>
+      <g transform="translate(470.314 553.686) rotate(45)">
+        <rect x="-27" y="-27" width="54" height="54" fill="#00B2B2" />
+      </g>
+      <g transform="translate(553.686 470.314) rotate(45)">
+        <rect x="-27" y="-27" width="54" height="54" fill="#00D9D9" />
+      </g>
+      <g transform="translate(637.058 386.942) rotate(45)">
+        <rect x="-27" y="-27" width="54" height="54" fill="#00FFFF" />
+      </g>
     </g>
   </g>
 </svg>
