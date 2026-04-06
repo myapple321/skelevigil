@@ -1,26 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- SkeleVigil static app icon: 1024x1024, 100px safe inset. #0D0D0D bg, #00FFFF mark. -->
+<!-- SkeleVigil app icon: 1024x1024, 100px safe. #0D0D0D bg. Frame: dim bracket (spec #121212 too close to bg at icon size—use #2A2A2A for legibility). -->
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <rect width="1024" height="1024" fill="#0D0D0D" />
+  <!-- Thick geometric C-bracket (Guardian-style), opening toward strand -->
+  <path
+    d="M 304 184 L 126 184 L 126 840 L 304 840"
+    fill="none"
+    stroke="#2A2A2A"
+    stroke-width="44"
+    stroke-linecap="square"
+    stroke-linejoin="miter"
+    stroke-miterlimit="8" />
+  <!-- Filament: 6px, dimmer cyan (pulse trail) -->
   <polyline
     fill="none"
-    stroke="#00FFFF"
-    stroke-width="2"
+    stroke="#00AAAA"
+    stroke-width="6"
     stroke-linecap="round"
     stroke-linejoin="round"
     points="386.94,637.06 470.31,553.69 553.69,470.31 637.06,386.94" />
-  <g fill="#00FFFF" stroke="none">
+  <!-- Diamonds: BL to TR; top-right = bright #00FFFF, others #00AAAA -->
+  <g stroke="none">
     <g transform="translate(386.942 637.058) rotate(45)">
-      <rect x="-27" y="-27" width="54" height="54" />
+      <rect x="-27" y="-27" width="54" height="54" fill="#00AAAA" />
     </g>
     <g transform="translate(470.314 553.686) rotate(45)">
-      <rect x="-27" y="-27" width="54" height="54" />
+      <rect x="-27" y="-27" width="54" height="54" fill="#00AAAA" />
     </g>
     <g transform="translate(553.686 470.314) rotate(45)">
-      <rect x="-27" y="-27" width="54" height="54" />
+      <rect x="-27" y="-27" width="54" height="54" fill="#00AAAA" />
     </g>
     <g transform="translate(637.058 386.942) rotate(45)">
-      <rect x="-27" y="-27" width="54" height="54" />
+      <rect x="-27" y="-27" width="54" height="54" fill="#00FFFF" />
     </g>
   </g>
 </svg>
