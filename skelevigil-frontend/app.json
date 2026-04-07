@@ -1,6 +1,7 @@
 {
+  "name": "SkeleVigil",
   "expo": {
-    "name": "skelevigil-frontend",
+    "name": "SkeleVigil",
     "slug": "skelevigil-frontend",
     "version": "1.0.0",
     "orientation": "portrait",
