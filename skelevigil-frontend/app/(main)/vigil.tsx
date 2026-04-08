@@ -224,7 +224,7 @@ export default function VigilScreen() {
           </Text>
         ) : failedIndex != null ? (
           <Text style={styles.failHint} accessibilityLiveRegion="polite">
-            The Strand has shattered. Tap 'New Game' to try a fresh grid.
+            The Strand has shattered. Tap 'New Game' and start a fresh mission.
           </Text>
         ) : phase === 'play' ? (
           <View
