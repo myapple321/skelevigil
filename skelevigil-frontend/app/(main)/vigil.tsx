@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     maxWidth: 340,
   },
   failHint: {
-    color: 'rgba(0,255,255,0.75)',
+    color: '#FFC68A',
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
