@@ -18,6 +18,8 @@ type Props = {
   showTiles: boolean;
   /** If set, animate the given tile as a "fail" shatter and disable further taps. */
   failedIndex?: number | null;
+  /** Excavation time expired: dim tiles / signal-loss overlay. */
+  timedOut?: boolean;
   /** 0..1 while system scan runs; null when idle. */
   scanProgress?: number | null;
   /** Increment to trigger success heartbeat pulse on neural blocks. */
@@ -38,6 +40,7 @@ export function GlimpseRevealBoard({
   neuralBlocks,
   showTiles,
   failedIndex = null,
+  timedOut = false,
   scanProgress = null,
   successPulseToken = 0,
   size = GLIMPSE_PREVIEW_SIZE,
@@ -49,6 +52,7 @@ export function GlimpseRevealBoard({
   const neuralTileSet = new Set(neuralBlocks.map(neuralBlockToTileIndex));
   const failAnim = useFailAnim(failedIndex);
   const heartbeatAnim = useSuccessPulse(successPulseToken);
+  const signalLossOpacity = useSignalLossOverlay(timedOut);
   const playFieldSize = Math.max(0, size - matPadding * 2);
   const scanTopPx =
     scanProgress == null ? null : Math.min(1, Math.max(0, scanProgress)) * playFieldSize;
@@ -96,7 +100,7 @@ export function GlimpseRevealBoard({
                   {[0, 1, 2, 3, 4].map((col) => {
                     const idx = row * 5 + col;
                     const isRevealed = revealed[idx] === true;
-                    const disabledAll = failedIndex != null;
+                    const disabledAll = failedIndex != null || timedOut;
                     return (
                       <Pressable
                         key={col}
@@ -126,6 +130,12 @@ export function GlimpseRevealBoard({
                 </View>
               ))}
             </View>
+          ) : null}
+          {showTiles && timedOut ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.signalLossOverlay, { opacity: signalLossOpacity }]}
+            />
           ) : null}
         </View>
       </View>
@@ -160,6 +170,12 @@ const styles = StyleSheet.create({
     zIndex: 2,
     elevation: 8,
     backgroundColor: 'transparent',
+  },
+  signalLossOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 4,
+    elevation: 12,
+    backgroundColor: SV.black,
   },
   row: {
     flex: 1,
@@ -260,6 +276,34 @@ function useFailAnim(failedIndex: number | null): any {
     opacity,
     transform: [{ translateX: shake }, { rotate: rot }, { scale }],
   };
+}
+
+function useSignalLossOverlay(active: boolean): Animated.Value {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const prevRef = useRef(false);
+
+  useEffect(() => {
+    if (active && !prevRef.current) {
+      prevRef.current = true;
+      opacity.setValue(0);
+      Animated.timing(opacity, {
+        toValue: 0.92,
+        duration: 720,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+    if (!active && prevRef.current) {
+      prevRef.current = false;
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [active, opacity]);
+
+  return opacity;
 }
 
 function useSuccessPulse(successPulseToken: number): any {

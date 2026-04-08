@@ -25,6 +25,8 @@ import { SV } from '@/src/theme/skelevigil';
 
 const MEMORIZE_MS = 5000;
 const SCAN_MS = 2000;
+const PLAY_TIME_SEC = 25;
+const TIMEOUT_AMBER = '#FFBF00';
 
 export default function VigilScreen() {
   const { sfxEnabled } = useSfxPreference();
@@ -38,6 +40,8 @@ export default function VigilScreen() {
   const [phase, setPhase] = useState<'memorize' | 'play'>('memorize');
   const [memorizeSecondsLeft, setMemorizeSecondsLeft] = useState(5);
   const [failedIndex, setFailedIndex] = useState<number | null>(null);
+  const [timedOut, setTimedOut] = useState(false);
+  const [playSecondsLeft, setPlaySecondsLeft] = useState(PLAY_TIME_SEC);
   const [passedExcavation, setPassedExcavation] = useState(false);
   const [scanProgress, setScanProgress] = useState<number | null>(null);
   const [finishPulse, setFinishPulse] = useState(false);
@@ -49,11 +53,15 @@ export default function VigilScreen() {
   );
   const revealedRef = useRef(revealed);
   revealedRef.current = revealed;
+  const finishScanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timedOutRef = useRef(timedOut);
+  timedOutRef.current = timedOut;
 
   useEffect(() => {
     setPhase('memorize');
     setMemorizeSecondsLeft(5);
     setFailedIndex(null);
+    setTimedOut(false);
     setPassedExcavation(false);
     const tick = setInterval(() => {
       setMemorizeSecondsLeft((s) => (s <= 1 ? 0 : s - 1));
@@ -68,14 +76,41 @@ export default function VigilScreen() {
     };
   }, [neuralBlocks]);
 
+  useEffect(() => {
+    if (phase !== 'play') return;
+    if (failedIndex != null || passedExcavation || timedOut) return;
+
+    setPlaySecondsLeft(PLAY_TIME_SEC);
+    const id = setInterval(() => {
+      setPlaySecondsLeft((s) => {
+        if (s <= 1) {
+          if (finishScanTimerRef.current) {
+            clearInterval(finishScanTimerRef.current);
+            finishScanTimerRef.current = null;
+          }
+          setScanProgress(null);
+          setTimedOut(true);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [phase, neuralBlocks, failedIndex, passedExcavation, timedOut]);
+
   const startNewGame = () => {
     setPhase('memorize');
     setMemorizeSecondsLeft(5);
     setNeuralBlocks(generateRandomNeuralBlocks());
     setGridColors(shuffledGlimpseGreyPalette());
     setFailedIndex(null);
+    setTimedOut(false);
     setPassedExcavation(false);
     setScanProgress(null);
+    if (finishScanTimerRef.current) {
+      clearInterval(finishScanTimerRef.current);
+      finishScanTimerRef.current = null;
+    }
     setFinishPulse(false);
     const fresh = Array.from({ length: 25 }, () => false);
     revealedRef.current = fresh;
@@ -84,12 +119,13 @@ export default function VigilScreen() {
 
   const onRevealCell = (index: number) => {
     if (phase !== 'play') return;
-    if (failedIndex != null) return;
+    if (failedIndex != null || timedOut) return;
     if (revealedRef.current[index]) return;
 
     const neuralTileSet = new Set(neuralBlocks.map(neuralBlockToTileIndex));
     if (neuralTileSet.has(index)) {
       setFailedIndex(index);
+      setTimedOut(false);
       setPassedExcavation(false);
       if (sfxEnabled) void playTileFailSfx();
       return;
@@ -118,7 +154,7 @@ export default function VigilScreen() {
 
   const onFinishExcavation = () => {
     if (phase !== 'play') return;
-    if (failedIndex != null) return;
+    if (failedIndex != null || timedOut) return;
     if (scanProgress != null) return;
 
     setFinishPulse(true);
@@ -133,6 +169,7 @@ export default function VigilScreen() {
       setScanProgress(next);
       if (next >= 1) {
         clearInterval(timer);
+        finishScanTimerRef.current = null;
         setScanProgress(null);
 
         const current = revealedRef.current;
@@ -142,7 +179,11 @@ export default function VigilScreen() {
         const neuralTileTouched = current.some((isRevealed, idx) =>
           neuralTileSet.has(idx) ? isRevealed : false,
         );
-        const success = safeTilesAllRevealed && !neuralTileTouched && failedIndex == null;
+        const success =
+          safeTilesAllRevealed &&
+          !neuralTileTouched &&
+          failedIndex == null &&
+          !timedOutRef.current;
 
         if (success) {
           setPassedExcavation(true);
@@ -155,10 +196,12 @@ export default function VigilScreen() {
 
         const firstNeuralIdx = neuralBlocks.length > 0 ? neuralBlockToTileIndex(neuralBlocks[0]!) : 0;
         setFailedIndex(firstNeuralIdx);
+        setTimedOut(false);
         setPassedExcavation(false);
         if (sfxEnabled) void playTileFailSfx();
       }
     }, 16);
+    finishScanTimerRef.current = timer;
   };
 
   return (
@@ -175,9 +218,17 @@ export default function VigilScreen() {
           <Text style={styles.successHint} accessibilityLiveRegion="polite">
             Success! You revealed the pattern perfectly. Tap New Game for your next grid.
           </Text>
+        ) : timedOut ? (
+          <Text style={styles.timeoutHint} accessibilityLiveRegion="polite">
+            Time limit reached. This attempt is over. Tap 'New Game' start a fresh mission.
+          </Text>
         ) : failedIndex != null ? (
           <Text style={styles.failHint} accessibilityLiveRegion="polite">
             The Strand has shattered. Tap 'New Game' to try a fresh grid.
+          </Text>
+        ) : phase === 'play' ? (
+          <Text style={styles.playTimerHint} accessibilityLiveRegion="polite">
+            Excavation time remaining: {playSecondsLeft}s
           </Text>
         ) : null}
         <View style={styles.gridWrap}>
@@ -186,6 +237,7 @@ export default function VigilScreen() {
             neuralBlocks={neuralBlocks}
             showTiles={phase === 'play'}
             failedIndex={failedIndex}
+            timedOut={timedOut}
             scanProgress={scanProgress}
             successPulseToken={successPulseToken}
             size={gridSize}
@@ -224,12 +276,15 @@ export default function VigilScreen() {
           </Pressable>
           <Pressable
             onPress={onFinishExcavation}
-            disabled={phase !== 'play' || failedIndex != null || scanProgress != null}
+            disabled={
+              phase !== 'play' || failedIndex != null || timedOut || scanProgress != null
+            }
             style={({ pressed }) => [
               styles.finishBtn,
               pressed && styles.finishBtnPressed,
               finishPulse && styles.finishBtnPulse,
-              (phase !== 'play' || failedIndex != null || scanProgress != null) && styles.finishBtnDisabled,
+              (phase !== 'play' || failedIndex != null || timedOut || scanProgress != null) &&
+                styles.finishBtnDisabled,
             ]}
             accessibilityRole="button"
             accessibilityLabel="Finish Excavation">
@@ -272,6 +327,31 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingHorizontal: 12,
     maxWidth: 340,
+  },
+  timeoutHint: {
+    color: TIMEOUT_AMBER,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,191,0,0.12)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,191,0,0.35)',
+    maxWidth: 360,
+  },
+  playTimerHint: {
+    color: SV.muted,
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    maxWidth: 360,
   },
   failHint: {
     color: '#FFC68A',
