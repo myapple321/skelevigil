@@ -15,7 +15,79 @@ import { GlimpseBlockGrid } from '@/src/components/game/GlimpseBlockGrid';
 import { buildGlimpseGreyPalette } from '@/src/game/glimpsePalette';
 import { SV } from '@/src/theme/skelevigil';
 
-const INFO_SOON_MESSAGE = 'The information will be available soon.';
+const BRIEFING_INTRO =
+  'Tap for a briefing on how to navigate the Hidden Path and secure the Strand.';
+
+type PhaseInfoId = 'glimpse' | 'stare' | 'trance';
+
+function BriefSection({ label, body }: { label: string; body: string }) {
+  return (
+    <View style={styles.modalSection}>
+      <Text style={styles.modalSectionLabel}>{label}</Text>
+      <Text style={styles.modalSectionBody}>{body}</Text>
+    </View>
+  );
+}
+
+function PhaseBriefingBody({ phase }: { phase: PhaseInfoId }) {
+  return (
+    <>
+      <Text style={styles.modalIntro}>{BRIEFING_INTRO}</Text>
+      {phase === 'glimpse' ? (
+        <>
+          <BriefSection label="Geometry" body="5×5 Square Grid." />
+          <BriefSection
+            label="Objective"
+            body="Memorize the path, then excavate the 25 surrounding blocks."
+          />
+          <BriefSection
+            label="Summary"
+            body='Focus on the Square architecture. You have a limited time to reveal the tiles that do not contain the Strand. Tap Finish Excavation once the path is clear.'
+          />
+        </>
+      ) : null}
+      {phase === 'stare' ? (
+        <>
+          <BriefSection label="Geometry" body="5×10 Diamond Grid." />
+          <BriefSection
+            label="Objective"
+            body="Navigate 50 complex shapes in a high-saturation environment."
+          />
+          <BriefSection
+            label="Summary"
+            body="The grid has shifted to Diamonds. With 50 units to scan, your focus must remain steady. Uncover the empty space while keeping the Hidden Path untouched."
+          />
+        </>
+      ) : null}
+      {phase === 'trance' ? (
+        <>
+          <BriefSection label="Geometry" body="Dual-Plato Stacking (Two layers)." />
+          <View style={styles.modalSection}>
+            <Text style={styles.modalSectionLabel}>Summary</Text>
+            <Text style={styles.modalSectionBody}>
+              You are now managing two planes of reality simultaneously. To secure the mission, you
+              must navigate both layers:
+            </Text>
+            <Text style={[styles.modalSectionBody, styles.modalBullet]}>
+              Top Plane: 50 Teal Diamonds.
+            </Text>
+            <Text style={[styles.modalSectionBody, styles.modalBullet]}>
+              Bottom Plane: 50 Amber Hexagons.
+            </Text>
+          </View>
+          <View style={styles.modalSection}>
+            <Text style={styles.modalSectionLabel}>Hint</Text>
+            <Text style={styles.modalSectionBody}>
+              Carefully clear the surrounding tiles on both levels. The Immutable Strand now vibrates
+              across two frequencies; if either plane is disturbed, the mission will end. Tap [Finish Excavation]
+              once both architectures are secure.
+            </Text>
+          </View>
+        </>
+      ) : null}
+    </>
+  );
+}
 
 const ART_SIZE = 132;
 
@@ -41,7 +113,9 @@ function PlaceholderArt() {
 
 export default function PhasesScreen() {
   const router = useRouter();
-  const [infoModalVisible, setInfoModalVisible] = useState(false);
+  const [phaseInfoOpen, setPhaseInfoOpen] = useState<PhaseInfoId | null>(null);
+  const infoModalVisible = phaseInfoOpen != null;
+  const closeInfoModal = () => setPhaseInfoOpen(null);
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -49,18 +123,23 @@ export default function PhasesScreen() {
         visible={infoModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setInfoModalVisible(false)}>
+        onRequestClose={closeInfoModal}>
         <View style={styles.modalBackdrop}>
           <Pressable
             style={StyleSheet.absoluteFillObject}
-            onPress={() => setInfoModalVisible(false)}
+            onPress={closeInfoModal}
             accessibilityRole="button"
             accessibilityLabel="Dismiss"
           />
           <View style={styles.modalCard}>
-            <Text style={styles.modalMessage}>{INFO_SOON_MESSAGE}</Text>
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={styles.modalScrollContent}
+              showsVerticalScrollIndicator>
+              {phaseInfoOpen ? <PhaseBriefingBody phase={phaseInfoOpen} /> : null}
+            </ScrollView>
             <Pressable
-              onPress={() => setInfoModalVisible(false)}
+              onPress={closeInfoModal}
               style={({ pressed }) => [
                 styles.modalDismiss,
                 pressed && styles.modalDismissPressed,
@@ -97,19 +176,7 @@ export default function PhasesScreen() {
             <View style={styles.actionColumn}>
               <View style={styles.actionRow}>
                 <Pressable
-                  onPress={() => router.push('/(main)/vigil')}
-                  style={({ pressed }) => [
-                    styles.playBtn,
-                    styles.playBtnFlex,
-                    styles.playBtnGlimpse,
-                    pressed && styles.playBtnPressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Play The Glimpse">
-                  <Text style={styles.playBtnText}>Play now</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setInfoModalVisible(true)}
+                  onPress={() => setPhaseInfoOpen('glimpse')}
                   style={({ pressed }) => [
                     styles.infoIconBtn,
                     pressed && styles.infoIconBtnPressed,
@@ -121,6 +188,18 @@ export default function PhasesScreen() {
                     size={26}
                     color={SV.neonCyan}
                   />
+                </Pressable>
+                <Pressable
+                  onPress={() => router.push('/(main)/vigil')}
+                  style={({ pressed }) => [
+                    styles.playBtn,
+                    styles.playBtnFlex,
+                    styles.playBtnGlimpse,
+                    pressed && styles.playBtnPressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Play The Glimpse">
+                  <Text style={styles.playBtnText}>Play now</Text>
                 </Pressable>
               </View>
             </View>
@@ -134,19 +213,7 @@ export default function PhasesScreen() {
             <View style={styles.actionColumn}>
               <View style={styles.actionRow}>
                 <Pressable
-                  onPress={() => {}}
-                  style={({ pressed }) => [
-                    styles.playBtn,
-                    styles.playBtnFlex,
-                    styles.playBtnStare,
-                    pressed && styles.playBtnPressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Play The Stare">
-                  <Text style={styles.playBtnText}>Play now</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setInfoModalVisible(true)}
+                  onPress={() => setPhaseInfoOpen('stare')}
                   style={({ pressed }) => [
                     styles.infoIconBtn,
                     pressed && styles.infoIconBtnPressed,
@@ -158,6 +225,18 @@ export default function PhasesScreen() {
                     size={26}
                     color={SV.neonCyan}
                   />
+                </Pressable>
+                <Pressable
+                  onPress={() => {}}
+                  style={({ pressed }) => [
+                    styles.playBtn,
+                    styles.playBtnFlex,
+                    styles.playBtnStare,
+                    pressed && styles.playBtnPressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Play The Stare">
+                  <Text style={styles.playBtnText}>Play now</Text>
                 </Pressable>
               </View>
             </View>
@@ -171,19 +250,7 @@ export default function PhasesScreen() {
             <View style={styles.actionColumn}>
               <View style={styles.actionRow}>
                 <Pressable
-                  onPress={() => {}}
-                  style={({ pressed }) => [
-                    styles.playBtn,
-                    styles.playBtnFlex,
-                    styles.playBtnTrance,
-                    pressed && styles.playBtnPressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Play The Trance">
-                  <Text style={styles.playBtnText}>Play now</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setInfoModalVisible(true)}
+                  onPress={() => setPhaseInfoOpen('trance')}
                   style={({ pressed }) => [
                     styles.infoIconBtn,
                     pressed && styles.infoIconBtnPressed,
@@ -195,6 +262,18 @@ export default function PhasesScreen() {
                     size={26}
                     color={SV.neonCyan}
                   />
+                </Pressable>
+                <Pressable
+                  onPress={() => {}}
+                  style={({ pressed }) => [
+                    styles.playBtn,
+                    styles.playBtnFlex,
+                    styles.playBtnTrance,
+                    pressed && styles.playBtnPressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Play The Trance">
+                  <Text style={styles.playBtnText}>Play now</Text>
                 </Pressable>
               </View>
             </View>
@@ -316,19 +395,49 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 340,
+    maxHeight: '82%',
     backgroundColor: SV.gunmetal,
     borderRadius: 12,
-    paddingVertical: 22,
+    paddingVertical: 18,
     paddingHorizontal: 20,
     borderWidth: 1,
     borderColor: 'rgba(0,255,255,0.25)',
   },
-  modalMessage: {
+  modalScroll: {
+    maxHeight: 420,
+    marginBottom: 16,
+  },
+  modalScrollContent: {
+    paddingBottom: 4,
+  },
+  modalIntro: {
     color: SV.surgicalWhite,
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 21,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
+    fontWeight: '600',
+  },
+  modalSection: {
+    marginBottom: 14,
+  },
+  modalSectionLabel: {
+    color: SV.neonCyan,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  modalSectionBody: {
+    color: SV.surgicalWhite,
+    fontSize: 15,
+    lineHeight: 21,
+    textAlign: 'left',
+  },
+  modalBullet: {
+    marginTop: 8,
+    paddingLeft: 8,
   },
   modalDismiss: {
     alignSelf: 'center',
