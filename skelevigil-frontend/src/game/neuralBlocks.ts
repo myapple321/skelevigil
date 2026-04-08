@@ -217,7 +217,7 @@ function walkVShape(): NeuralBlock[] {
 type Pattern = 'X' | 'Y' | 'D' | 'L' | 'V_SHAPE';
 
 /**
- * Random path through adjacent blocks (≥3 cells). New path each New Game.
+ * Random path through adjacent blocks (≥3 cells). New path each New Mission.
  */
 export function generateRandomNeuralBlocks(): NeuralBlock[] {
   const patterns: Pattern[] = ['X', 'Y', 'D', 'L', 'V_SHAPE'];

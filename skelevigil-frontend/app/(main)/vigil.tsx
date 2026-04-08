@@ -149,7 +149,7 @@ export default function VigilScreen() {
   };
 
   const onOpenNewGameHelp = () => {
-    Alert.alert('New Game', 'Tap here to reset the vault and begin a fresh mission.');
+    Alert.alert('New Mission', 'Tap here to reset the vault and begin a fresh mission.');
   };
 
   const onFinishExcavation = () => {
@@ -216,15 +216,15 @@ export default function VigilScreen() {
           </Text>
         ) : passedExcavation ? (
           <Text style={styles.successHint} accessibilityLiveRegion="polite">
-            Success! You revealed the pattern perfectly. Tap New Game for your next grid.
+            Success! You revealed the pattern perfectly. Tap 'New Mission' to start again.
           </Text>
         ) : timedOut ? (
           <Text style={styles.timeoutHint} accessibilityLiveRegion="polite">
-            Time limit reached. This attempt is over. Tap 'New Game' start a fresh mission.
+            Time limit reached. This attempt is over. Tap 'New Mission' to start again.
           </Text>
         ) : failedIndex != null ? (
           <Text style={styles.failHint} accessibilityLiveRegion="polite">
-            The Strand has shattered. Tap 'New Game' and start a fresh mission.
+            The Strand has shattered. Tap 'New Mission' to start again.
           </Text>
         ) : phase === 'play' ? (
           <View
@@ -269,7 +269,7 @@ export default function VigilScreen() {
             onPress={onOpenNewGameHelp}
             style={({ pressed }) => [styles.newGameInfoBtn, pressed && styles.newGameInfoBtnPressed]}
             accessibilityRole="button"
-            accessibilityLabel="New game info">
+            accessibilityLabel="New mission info">
             <Text style={styles.newGameInfoText}>i</Text>
           </Pressable>
           <Pressable
@@ -279,8 +279,8 @@ export default function VigilScreen() {
               pressed && styles.newGameBtnPressed,
             ]}
             accessibilityRole="button"
-            accessibilityLabel="New game, shuffle the grid">
-            <Text style={styles.newGameBtnText}>New Game</Text>
+            accessibilityLabel="New mission, shuffle the grid">
+            <Text style={styles.newGameBtnText}>New Mission</Text>
           </Pressable>
         </View>
         <View style={styles.finishBottomRow}>
