@@ -8,12 +8,12 @@ import {
   GLIMPSE_GRID_INSET,
   GLIMPSE_PREVIEW_SIZE,
 } from '@/src/components/game/GlimpseBlockGrid';
-import { type BlockCoord, blockToTileIndex } from '@/src/game/neuralString';
+import { type NeuralBlock, neuralBlockToTileIndex } from '@/src/game/neuralBlocks';
 
 type Props = {
   colors: string[];
   /** Path cells; each is drawn as its own rounded rect (no line between cells). */
-  neuralBlocks: BlockCoord[];
+  neuralBlocks: NeuralBlock[];
   /** When false, only the mat + neural blocks show — tiles hidden. */
   showTiles: boolean;
   /** If set, animate the given tile as a "fail" shatter and disable further taps. */
@@ -40,7 +40,7 @@ export function GlimpseRevealBoard({
   revealed,
   onRevealCell,
 }: Props) {
-  const neuralTileSet = new Set(neuralBlocks.map(blockToTileIndex));
+  const neuralTileSet = new Set(neuralBlocks.map(neuralBlockToTileIndex));
   const failAnim = useFailAnim(failedIndex);
 
   return (

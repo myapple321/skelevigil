@@ -8,7 +8,7 @@
  * SVG uses viewBox 0–100 with RN row 0 at the top: `screenRow = 4 - y`.
  */
 
-export type BlockCoord = { x: number; y: number };
+export type NeuralBlock = { x: number; y: number };
 
 const MAX = 4;
 
@@ -16,15 +16,15 @@ function randInt(min: number, max: number): number {
   return min + Math.floor(Math.random() * (max - min + 1));
 }
 
-function clampBlock(b: BlockCoord): BlockCoord {
+function clampBlock(b: NeuralBlock): NeuralBlock {
   return {
     x: Math.min(MAX, Math.max(0, Math.round(b.x))),
     y: Math.min(MAX, Math.max(0, Math.round(b.y))),
   };
 }
 
-function dedupeConsecutive(blocks: BlockCoord[]): BlockCoord[] {
-  const out: BlockCoord[] = [];
+function dedupeConsecutive(blocks: NeuralBlock[]): NeuralBlock[] {
+  const out: NeuralBlock[] = [];
   for (const b of blocks) {
     const c = clampBlock(b);
     const prev = out[out.length - 1];
@@ -34,7 +34,7 @@ function dedupeConsecutive(blocks: BlockCoord[]): BlockCoord[] {
 }
 
 /** RN tile index: row-major, row 0 = top; matches `GlimpseRevealBoard` cell order. */
-export function blockToTileIndex(b: BlockCoord): number {
+export function neuralBlockToTileIndex(b: NeuralBlock): number {
   const screenRow = MAX - b.y;
   return screenRow * 5 + b.x;
 }
@@ -42,7 +42,7 @@ export function blockToTileIndex(b: BlockCoord): number {
 // so neural blocks align perfectly and can be fully hidden by opaque tiles.
 
 /** Bottom row, left column, or interior — user space. */
-function pickStartBlock(): BlockCoord {
+function pickStartBlock(): NeuralBlock {
   const r = Math.random();
   if (r < 0.34) return { x: randInt(0, MAX), y: 0 };
   if (r < 0.67) return { x: 0, y: randInt(0, MAX) };
@@ -50,13 +50,13 @@ function pickStartBlock(): BlockCoord {
 }
 
 /** Linear X: fixed y, steps along x (3–5 blocks). */
-function walkLineX(): BlockCoord[] {
+function walkLineX(): NeuralBlock[] {
   for (let t = 0; t < 24; t++) {
     const y = randInt(0, MAX);
     const dir = Math.random() < 0.5 ? 1 : -1;
     const len = randInt(3, 5);
     let x = randInt(0, MAX);
-    const out: BlockCoord[] = [{ x, y }];
+    const out: NeuralBlock[] = [{ x, y }];
     let ok = true;
     for (let i = 1; i < len; i++) {
       x += dir;
@@ -77,13 +77,13 @@ function walkLineX(): BlockCoord[] {
 }
 
 /** Linear Y: fixed x, steps along y (3–5 blocks) — e.g. column 3, y=0..3. */
-function walkLineY(): BlockCoord[] {
+function walkLineY(): NeuralBlock[] {
   for (let t = 0; t < 24; t++) {
     const x = randInt(0, MAX);
     const dir = Math.random() < 0.5 ? 1 : -1;
     const len = randInt(3, 5);
     let y = randInt(0, MAX);
-    const out: BlockCoord[] = [{ x, y }];
+    const out: NeuralBlock[] = [{ x, y }];
     let ok = true;
     for (let i = 1; i < len; i++) {
       y += dir;
@@ -103,14 +103,14 @@ function walkLineY(): BlockCoord[] {
   ];
 }
 
-function walkDiagonal(): BlockCoord[] {
+function walkDiagonal(): NeuralBlock[] {
   for (let t = 0; t < 24; t++) {
     const dx = Math.random() < 0.5 ? 1 : -1;
     const dy = Math.random() < 0.5 ? 1 : -1;
     const len = randInt(3, 5);
     let x = randInt(0, MAX);
     let y = randInt(0, MAX);
-    const out: BlockCoord[] = [{ x, y }];
+    const out: NeuralBlock[] = [{ x, y }];
     let ok = true;
     for (let i = 1; i < len; i++) {
       x += dx;
@@ -132,7 +132,7 @@ function walkDiagonal(): BlockCoord[] {
 }
 
 /** Orthogonal L: horizontal leg then vertical or the reverse. */
-function walkL(): BlockCoord[] {
+function walkL(): NeuralBlock[] {
   for (let t = 0; t < 24; t++) {
     const horizontalFirst = Math.random() < 0.5;
     const dir1 = Math.random() < 0.5 ? 1 : -1;
@@ -140,7 +140,7 @@ function walkL(): BlockCoord[] {
     const leg1 = randInt(2, 3);
     const leg2 = randInt(2, 3);
     const start = pickStartBlock();
-    const out: BlockCoord[] = [start];
+    const out: NeuralBlock[] = [start];
     let ok = true;
 
     if (horizontalFirst) {
@@ -190,7 +190,7 @@ function walkL(): BlockCoord[] {
 }
 
 /** V: left foot → apex → right foot (block centers). */
-function walkVShape(): BlockCoord[] {
+function walkVShape(): NeuralBlock[] {
   for (let t = 0; t < 20; t++) {
     const ax = randInt(1, MAX - 1);
     const ay = randInt(1, MAX - 1);
@@ -219,12 +219,12 @@ type Pattern = 'X' | 'Y' | 'D' | 'L' | 'V_SHAPE';
 /**
  * Random path through adjacent blocks (≥3 cells). New path each New Game.
  */
-export function generateRandomNeuralBlocks(): BlockCoord[] {
+export function generateRandomNeuralBlocks(): NeuralBlock[] {
   const patterns: Pattern[] = ['X', 'Y', 'D', 'L', 'V_SHAPE'];
 
   for (let attempt = 0; attempt < 16; attempt++) {
     const p = patterns[randInt(0, patterns.length - 1)]!;
-    let pts: BlockCoord[] = [];
+    let pts: NeuralBlock[] = [];
     switch (p) {
       case 'X':
         pts = walkLineX();
@@ -248,3 +248,4 @@ export function generateRandomNeuralBlocks(): BlockCoord[] {
 
   return walkLineY();
 }
+

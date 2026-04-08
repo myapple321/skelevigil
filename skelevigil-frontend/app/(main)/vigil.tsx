@@ -19,7 +19,7 @@ import { playTileRevealSfx } from '@/src/audio/tileRevealSfx';
 import { GlimpseRevealBoard } from '@/src/components/game/GlimpseRevealBoard';
 import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
 import { shuffledGlimpseGreyPalette } from '@/src/game/glimpsePalette';
-import { blockToTileIndex, generateRandomNeuralBlocks } from '@/src/game/neuralString';
+import { generateRandomNeuralBlocks, neuralBlockToTileIndex } from '@/src/game/neuralBlocks';
 import { SV } from '@/src/theme/skelevigil';
 
 const MEMORIZE_MS = 5000;
@@ -77,7 +77,7 @@ export default function VigilScreen() {
     if (failedIndex != null) return;
     if (revealedRef.current[index]) return;
 
-    const neuralTileSet = new Set(neuralBlocks.map(blockToTileIndex));
+    const neuralTileSet = new Set(neuralBlocks.map(neuralBlockToTileIndex));
     if (neuralTileSet.has(index)) {
       setFailedIndex(index);
       if (sfxEnabled) void playTileFailSfx();
