@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { AuthGate } from '@/src/components/auth/AuthGate';
+import { SfxPreferenceProvider } from '@/src/contexts/SfxPreferenceContext';
 
 export {
   ErrorBoundary,
@@ -52,13 +53,15 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={navigationTheme}>
       <StatusBar style="light" />
-      <AuthGate>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(main)" />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: true }} />
-        </Stack>
-      </AuthGate>
+      <SfxPreferenceProvider>
+        <AuthGate>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(main)" />
+            <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: true }} />
+          </Stack>
+        </AuthGate>
+      </SfxPreferenceProvider>
     </ThemeProvider>
   );
 }

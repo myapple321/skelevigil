@@ -5,9 +5,18 @@ import { router } from 'expo-router';
 import { deleteUser, signOut, type User } from 'firebase/auth';
 import type { ComponentProps } from 'react';
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
 import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
 import { mapAuthErrorMessage } from '@/src/firebase/mapAuthError';
 import { SV } from '@/src/theme/skelevigil';
@@ -48,6 +57,29 @@ function deleteModalAccountSummary(user: User): { emailDisplay: string; methodsL
 }
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
+
+function SoundEffectsRow() {
+  const { sfxEnabled, setSfxEnabled, hydrated } = useSfxPreference();
+  return (
+    <View style={styles.toggleRow}>
+      <View style={styles.rowMain}>
+        <Ionicons name="volume-high-outline" size={22} color={SV.neonCyan} style={styles.rowIcon} />
+        <View style={styles.toggleTextBlock}>
+          <Text style={styles.toggleTitle}>Sound effects</Text>
+          <Text style={styles.toggleSub}>Short sound when a tile is revealed.</Text>
+        </View>
+      </View>
+      <Switch
+        value={sfxEnabled}
+        disabled={!hydrated}
+        onValueChange={(v) => void setSfxEnabled(v)}
+        trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(0,255,255,0.35)' }}
+        thumbColor={sfxEnabled ? SV.surgicalWhite : 'rgba(200,200,200,0.95)'}
+        ios_backgroundColor="rgba(255,255,255,0.12)"
+      />
+    </View>
+  );
+}
 
 function Row({
   title,
@@ -219,6 +251,11 @@ export default function SystemIndexScreen() {
           />
         </View>
 
+        <Text style={styles.sectionTitle}>Preferences</Text>
+        <View style={styles.card}>
+          <SoundEffectsRow />
+        </View>
+
         <Text style={styles.sectionTitle}>Support</Text>
         <View style={styles.card}>
           <Row
@@ -300,6 +337,30 @@ const styles = StyleSheet.create({
     color: SV.surgicalWhite,
     fontSize: 16,
     fontWeight: '600',
+  },
+  toggleRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  toggleTextBlock: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+  },
+  toggleTitle: {
+    color: SV.surgicalWhite,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  toggleSub: {
+    color: SV.muted,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
   },
   divider: {
     height: 1,

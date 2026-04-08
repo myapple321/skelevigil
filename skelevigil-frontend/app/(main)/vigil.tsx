@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -14,11 +14,14 @@ import {
   GLIMPSE_GRID_INSET,
   GLIMPSE_PREVIEW_SIZE,
 } from '@/src/components/game/GlimpseBlockGrid';
+import { playTileRevealSfx } from '@/src/audio/tileRevealSfx';
 import { GlimpseRevealBoard } from '@/src/components/game/GlimpseRevealBoard';
+import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
 import { shuffledGlimpseGreyPalette } from '@/src/game/glimpsePalette';
 import { SV } from '@/src/theme/skelevigil';
 
 export default function VigilScreen() {
+  const { sfxEnabled } = useSfxPreference();
   const { width } = useWindowDimensions();
   const gridSize = Math.min(Math.max(width - 40, 220), 360);
   const scale = gridSize / GLIMPSE_PREVIEW_SIZE;
@@ -29,10 +32,26 @@ export default function VigilScreen() {
   const [revealed, setRevealed] = useState<boolean[]>(() =>
     Array.from({ length: 25 }, () => false),
   );
+  const revealedRef = useRef(revealed);
+  revealedRef.current = revealed;
 
   const startNewGame = () => {
     setGridColors(shuffledGlimpseGreyPalette());
-    setRevealed(Array.from({ length: 25 }, () => false));
+    const fresh = Array.from({ length: 25 }, () => false);
+    revealedRef.current = fresh;
+    setRevealed(fresh);
+  };
+
+  const onRevealCell = (index: number) => {
+    if (revealedRef.current[index]) return;
+    if (sfxEnabled) void playTileRevealSfx();
+    setRevealed((prev) => {
+      if (prev[index]) return prev;
+      const next = [...prev];
+      next[index] = true;
+      revealedRef.current = next;
+      return next;
+    });
   };
 
   return (
@@ -48,14 +67,7 @@ export default function VigilScreen() {
             matPadding={matPadding}
             cellGap={cellGap}
             revealed={revealed}
-            onRevealCell={(index) => {
-              setRevealed((prev) => {
-                if (prev[index]) return prev;
-                const next = [...prev];
-                next[index] = true;
-                return next;
-              });
-            }}
+            onRevealCell={onRevealCell}
           />
         </View>
         <Pressable
