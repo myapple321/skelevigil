@@ -13,8 +13,8 @@ import {
   GLIMPSE_CELL_GAP,
   GLIMPSE_GRID_INSET,
   GLIMPSE_PREVIEW_SIZE,
-  GlimpseBlockGrid,
 } from '@/src/components/game/GlimpseBlockGrid';
+import { GlimpseRevealBoard } from '@/src/components/game/GlimpseRevealBoard';
 import { shuffledGlimpseGreyPalette } from '@/src/game/glimpsePalette';
 import { SV } from '@/src/theme/skelevigil';
 
@@ -26,6 +26,14 @@ export default function VigilScreen() {
   const cellGap = Math.max(2, Math.round(GLIMPSE_CELL_GAP * scale));
 
   const [gridColors, setGridColors] = useState(() => shuffledGlimpseGreyPalette());
+  const [revealed, setRevealed] = useState<boolean[]>(() =>
+    Array.from({ length: 25 }, () => false),
+  );
+
+  const startNewGame = () => {
+    setGridColors(shuffledGlimpseGreyPalette());
+    setRevealed(Array.from({ length: 25 }, () => false));
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -34,15 +42,24 @@ export default function VigilScreen() {
         showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>The Glimpse</Text>
         <View style={styles.gridWrap}>
-          <GlimpseBlockGrid
+          <GlimpseRevealBoard
             colors={gridColors}
             size={gridSize}
             matPadding={matPadding}
             cellGap={cellGap}
+            revealed={revealed}
+            onRevealCell={(index) => {
+              setRevealed((prev) => {
+                if (prev[index]) return prev;
+                const next = [...prev];
+                next[index] = true;
+                return next;
+              });
+            }}
           />
         </View>
         <Pressable
-          onPress={() => setGridColors(shuffledGlimpseGreyPalette())}
+          onPress={startNewGame}
           style={({ pressed }) => [
             styles.newGameBtn,
             pressed && styles.newGameBtnPressed,
