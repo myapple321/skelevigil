@@ -14,11 +14,12 @@ import {
   GLIMPSE_GRID_INSET,
   GLIMPSE_PREVIEW_SIZE,
 } from '@/src/components/game/GlimpseBlockGrid';
+import { playTileFailSfx } from '@/src/audio/tileFailSfx';
 import { playTileRevealSfx } from '@/src/audio/tileRevealSfx';
 import { GlimpseRevealBoard } from '@/src/components/game/GlimpseRevealBoard';
 import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
 import { shuffledGlimpseGreyPalette } from '@/src/game/glimpsePalette';
-import { generateRandomNeuralBlocks } from '@/src/game/neuralString';
+import { blockToTileIndex, generateRandomNeuralBlocks } from '@/src/game/neuralString';
 import { SV } from '@/src/theme/skelevigil';
 
 const MEMORIZE_MS = 5000;
@@ -34,6 +35,7 @@ export default function VigilScreen() {
   const [neuralBlocks, setNeuralBlocks] = useState(() => generateRandomNeuralBlocks());
   const [phase, setPhase] = useState<'memorize' | 'play'>('memorize');
   const [memorizeSecondsLeft, setMemorizeSecondsLeft] = useState(5);
+  const [failedIndex, setFailedIndex] = useState<number | null>(null);
 
   const [gridColors, setGridColors] = useState(() => shuffledGlimpseGreyPalette());
   const [revealed, setRevealed] = useState<boolean[]>(() =>
@@ -45,6 +47,7 @@ export default function VigilScreen() {
   useEffect(() => {
     setPhase('memorize');
     setMemorizeSecondsLeft(5);
+    setFailedIndex(null);
     const tick = setInterval(() => {
       setMemorizeSecondsLeft((s) => (s <= 1 ? 0 : s - 1));
     }, 1000);
@@ -63,13 +66,24 @@ export default function VigilScreen() {
     setMemorizeSecondsLeft(5);
     setNeuralBlocks(generateRandomNeuralBlocks());
     setGridColors(shuffledGlimpseGreyPalette());
+    setFailedIndex(null);
     const fresh = Array.from({ length: 25 }, () => false);
     revealedRef.current = fresh;
     setRevealed(fresh);
   };
 
   const onRevealCell = (index: number) => {
+    if (phase !== 'play') return;
+    if (failedIndex != null) return;
     if (revealedRef.current[index]) return;
+
+    const neuralTileSet = new Set(neuralBlocks.map(blockToTileIndex));
+    if (neuralTileSet.has(index)) {
+      setFailedIndex(index);
+      if (sfxEnabled) void playTileFailSfx();
+      return;
+    }
+
     if (sfxEnabled) void playTileRevealSfx();
     setRevealed((prev) => {
       if (prev[index]) return prev;
@@ -90,12 +104,17 @@ export default function VigilScreen() {
           <Text style={styles.memorizeHint} accessibilityLiveRegion="polite">
             Memorize the neural blocks. Tiles return in {memorizeSecondsLeft}s.
           </Text>
+        ) : failedIndex != null ? (
+          <Text style={styles.failHint} accessibilityLiveRegion="polite">
+            The Strand has shattered. Tap 'New Game' to try a fresh grid.
+          </Text>
         ) : null}
         <View style={styles.gridWrap}>
           <GlimpseRevealBoard
             colors={gridColors}
             neuralBlocks={neuralBlocks}
             showTiles={phase === 'play'}
+            failedIndex={failedIndex}
             size={gridSize}
             matPadding={matPadding}
             cellGap={cellGap}
@@ -149,6 +168,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingHorizontal: 12,
     maxWidth: 340,
+  },
+  failHint: {
+    color: 'rgba(0,255,255,0.75)',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(0,255,255,0.06)',
+    borderRadius: 8,
+    maxWidth: 360,
   },
   gridWrap: {
     alignItems: 'center',

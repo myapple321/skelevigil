@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
 
 import { SV } from '@/src/theme/skelevigil';
 
@@ -15,6 +16,8 @@ type Props = {
   neuralBlocks: BlockCoord[];
   /** When false, only the mat + neural blocks show — tiles hidden. */
   showTiles: boolean;
+  /** If set, animate the given tile as a "fail" shatter and disable further taps. */
+  failedIndex?: number | null;
   size?: number;
   matPadding?: number;
   cellGap?: number;
@@ -30,6 +33,7 @@ export function GlimpseRevealBoard({
   colors,
   neuralBlocks,
   showTiles,
+  failedIndex = null,
   size = GLIMPSE_PREVIEW_SIZE,
   matPadding = GLIMPSE_GRID_INSET,
   cellGap = GLIMPSE_CELL_GAP,
@@ -37,6 +41,7 @@ export function GlimpseRevealBoard({
   onRevealCell,
 }: Props) {
   const neuralTileSet = new Set(neuralBlocks.map(blockToTileIndex));
+  const failAnim = useFailAnim(failedIndex);
 
   return (
     <View style={[styles.artFrame, { width: size, height: size }]}>
@@ -73,10 +78,11 @@ export function GlimpseRevealBoard({
                   {[0, 1, 2, 3, 4].map((col) => {
                     const idx = row * 5 + col;
                     const isRevealed = revealed[idx] === true;
+                    const disabledAll = failedIndex != null;
                     return (
                       <Pressable
                         key={col}
-                        disabled={isRevealed}
+                        disabled={isRevealed || disabledAll}
                         onPress={() => onRevealCell(idx)}
                         style={styles.cellPressable}
                         accessibilityRole="button"
@@ -86,13 +92,14 @@ export function GlimpseRevealBoard({
                             : `Remove tile ${idx + 1}`
                         }
                         accessibilityState={{ disabled: isRevealed }}>
-                        <View
+                        <Animated.View
                           style={[
                             styles.cell,
                             isRevealed ? styles.cellRevealed : null,
                             !isRevealed
                               ? { backgroundColor: colors[idx] ?? SV.muted }
                               : null,
+                            idx === failedIndex ? failAnim : null,
                           ]}
                         />
                       </Pressable>
@@ -168,3 +175,49 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
   },
 });
+
+function useFailAnim(failedIndex: number | null): any {
+  const progressRef = useRef(new Animated.Value(0));
+  const prevIndexRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (failedIndex == null) return;
+    if (prevIndexRef.current === failedIndex) return;
+    prevIndexRef.current = failedIndex;
+
+    const p = progressRef.current;
+    p.setValue(0);
+    Animated.sequence([
+      Animated.timing(p, {
+        toValue: 1,
+        duration: 420,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [failedIndex]);
+
+  const p = progressRef.current;
+
+  const shake = p.interpolate({
+    inputRange: [0, 0.08, 0.16, 0.24, 0.32, 0.42, 1],
+    outputRange: [0, -6, 6, -5, 4, 0, 0],
+  });
+  const rot = p.interpolate({
+    inputRange: [0, 0.25, 0.5, 1],
+    outputRange: ['0deg', '-3deg', '2deg', '0deg'],
+  });
+  const scale = p.interpolate({
+    inputRange: [0, 0.3, 1],
+    outputRange: [1, 0.92, 0.18],
+  });
+  const opacity = p.interpolate({
+    inputRange: [0, 0.65, 1],
+    outputRange: [1, 1, 0],
+  });
+
+  return {
+    opacity,
+    transform: [{ translateX: shake }, { rotate: rot }, { scale }],
+  };
+}
