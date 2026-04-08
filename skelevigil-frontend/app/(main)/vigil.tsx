@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,6 +24,7 @@ import { generateRandomNeuralBlocks, neuralBlockToTileIndex } from '@/src/game/n
 import { SV } from '@/src/theme/skelevigil';
 
 const MEMORIZE_MS = 5000;
+const SCAN_MS = 2000;
 
 export default function VigilScreen() {
   const { sfxEnabled } = useSfxPreference();
@@ -36,6 +38,10 @@ export default function VigilScreen() {
   const [phase, setPhase] = useState<'memorize' | 'play'>('memorize');
   const [memorizeSecondsLeft, setMemorizeSecondsLeft] = useState(5);
   const [failedIndex, setFailedIndex] = useState<number | null>(null);
+  const [passedExcavation, setPassedExcavation] = useState(false);
+  const [scanProgress, setScanProgress] = useState<number | null>(null);
+  const [finishPulse, setFinishPulse] = useState(false);
+  const [successPulseToken, setSuccessPulseToken] = useState(0);
 
   const [gridColors, setGridColors] = useState(() => shuffledGlimpseGreyPalette());
   const [revealed, setRevealed] = useState<boolean[]>(() =>
@@ -48,6 +54,7 @@ export default function VigilScreen() {
     setPhase('memorize');
     setMemorizeSecondsLeft(5);
     setFailedIndex(null);
+    setPassedExcavation(false);
     const tick = setInterval(() => {
       setMemorizeSecondsLeft((s) => (s <= 1 ? 0 : s - 1));
     }, 1000);
@@ -67,6 +74,9 @@ export default function VigilScreen() {
     setNeuralBlocks(generateRandomNeuralBlocks());
     setGridColors(shuffledGlimpseGreyPalette());
     setFailedIndex(null);
+    setPassedExcavation(false);
+    setScanProgress(null);
+    setFinishPulse(false);
     const fresh = Array.from({ length: 25 }, () => false);
     revealedRef.current = fresh;
     setRevealed(fresh);
@@ -80,6 +90,7 @@ export default function VigilScreen() {
     const neuralTileSet = new Set(neuralBlocks.map(neuralBlockToTileIndex));
     if (neuralTileSet.has(index)) {
       setFailedIndex(index);
+      setPassedExcavation(false);
       if (sfxEnabled) void playTileFailSfx();
       return;
     }
@@ -94,6 +105,62 @@ export default function VigilScreen() {
     });
   };
 
+  const onOpenFinishHelp = () => {
+    Alert.alert(
+      'Finish Excavation',
+      'Tap this when you believe you have safely revealed the entire Hidden Path. The system will scan your excavation to see if the Strand is still intact.',
+    );
+  };
+
+  const onOpenNewGameHelp = () => {
+    Alert.alert('New Game', 'Tap here to reset the vault and begin a fresh mission.');
+  };
+
+  const onFinishExcavation = () => {
+    if (phase !== 'play') return;
+    if (failedIndex != null) return;
+    if (scanProgress != null) return;
+
+    setFinishPulse(true);
+    setTimeout(() => setFinishPulse(false), 220);
+
+    const neuralTileSet = new Set(neuralBlocks.map(neuralBlockToTileIndex));
+    setScanProgress(0);
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - startedAt;
+      const next = Math.min(1, elapsed / SCAN_MS);
+      setScanProgress(next);
+      if (next >= 1) {
+        clearInterval(timer);
+        setScanProgress(null);
+
+        const current = revealedRef.current;
+        const safeTilesAllRevealed = current.every((isRevealed, idx) =>
+          neuralTileSet.has(idx) ? true : isRevealed,
+        );
+        const neuralTileTouched = current.some((isRevealed, idx) =>
+          neuralTileSet.has(idx) ? isRevealed : false,
+        );
+        const success = safeTilesAllRevealed && !neuralTileTouched && failedIndex == null;
+
+        if (success) {
+          setPassedExcavation(true);
+          setSuccessPulseToken((n) => n + 1);
+          const fullyRevealed = Array.from({ length: 25 }, () => true);
+          revealedRef.current = fullyRevealed;
+          setRevealed(fullyRevealed);
+          return;
+        }
+
+        const firstNeuralIdx = neuralBlocks.length > 0 ? neuralBlockToTileIndex(neuralBlocks[0]!) : 0;
+        setFailedIndex(firstNeuralIdx);
+        setPassedExcavation(false);
+        if (sfxEnabled) void playTileFailSfx();
+      }
+    }, 16);
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView
@@ -103,6 +170,10 @@ export default function VigilScreen() {
         {phase === 'memorize' ? (
           <Text style={styles.memorizeHint} accessibilityLiveRegion="polite">
             Memorize the neural blocks. Tiles return in {memorizeSecondsLeft}s.
+          </Text>
+        ) : passedExcavation ? (
+          <Text style={styles.successHint} accessibilityLiveRegion="polite">
+            Success! You revealed the pattern perfectly. Tap New Game for your next grid.
           </Text>
         ) : failedIndex != null ? (
           <Text style={styles.failHint} accessibilityLiveRegion="polite">
@@ -115,6 +186,8 @@ export default function VigilScreen() {
             neuralBlocks={neuralBlocks}
             showTiles={phase === 'play'}
             failedIndex={failedIndex}
+            scanProgress={scanProgress}
+            successPulseToken={successPulseToken}
             size={gridSize}
             matPadding={matPadding}
             cellGap={cellGap}
@@ -122,16 +195,47 @@ export default function VigilScreen() {
             onRevealCell={onRevealCell}
           />
         </View>
-        <Pressable
-          onPress={startNewGame}
-          style={({ pressed }) => [
-            styles.newGameBtn,
-            pressed && styles.newGameBtnPressed,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="New game, shuffle the grid">
-          <Text style={styles.newGameBtnText}>New Game</Text>
-        </Pressable>
+        <View style={styles.newGameRow}>
+          <Pressable
+            onPress={onOpenNewGameHelp}
+            style={({ pressed }) => [styles.newGameInfoBtn, pressed && styles.newGameInfoBtnPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="New game info">
+            <Text style={styles.newGameInfoText}>i</Text>
+          </Pressable>
+          <Pressable
+            onPress={startNewGame}
+            style={({ pressed }) => [
+              styles.newGameBtn,
+              pressed && styles.newGameBtnPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="New game, shuffle the grid">
+            <Text style={styles.newGameBtnText}>New Game</Text>
+          </Pressable>
+        </View>
+        <View style={styles.finishBottomRow}>
+          <Pressable
+            onPress={onOpenFinishHelp}
+            style={({ pressed }) => [styles.finishInfoBtn, pressed && styles.finishInfoBtnPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Finish excavation info">
+            <Text style={styles.finishInfoText}>i</Text>
+          </Pressable>
+          <Pressable
+            onPress={onFinishExcavation}
+            disabled={phase !== 'play' || failedIndex != null || scanProgress != null}
+            style={({ pressed }) => [
+              styles.finishBtn,
+              pressed && styles.finishBtnPressed,
+              finishPulse && styles.finishBtnPulse,
+              (phase !== 'play' || failedIndex != null || scanProgress != null) && styles.finishBtnDisabled,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Finish Excavation">
+            <Text style={styles.finishBtnText}>Finish Excavation</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -182,13 +286,52 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     maxWidth: 360,
   },
+  successHint: {
+    color: SV.neonCyan,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(0,255,255,0.08)',
+    borderRadius: 8,
+    maxWidth: 360,
+  },
   gridWrap: {
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 10,
+  },
+  newGameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  newGameInfoBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: SV.neonCyan,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,255,255,0.08)',
+  },
+  newGameInfoBtnPressed: {
+    opacity: 0.85,
+  },
+  newGameInfoText: {
+    color: SV.neonCyan,
+    fontSize: 16,
+    fontWeight: '700',
   },
   newGameBtn: {
     alignSelf: 'center',
-    marginTop: 28,
+    minWidth: 210,
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 8,
@@ -203,6 +346,66 @@ const styles = StyleSheet.create({
     color: SV.surgicalWhite,
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
+  },
+  finishWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  finishBottomRow: {
+    marginTop: 0,
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  finishInfoBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: SV.neonCyan,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,255,255,0.08)',
+  },
+  finishInfoBtnPressed: {
+    opacity: 0.85,
+  },
+  finishInfoText: {
+    color: SV.neonCyan,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  finishBtn: {
+    minWidth: 210,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: SV.neonCyan,
+    borderWidth: 1,
+    borderColor: SV.neonCyan,
+    shadowColor: SV.neonCyan,
+    shadowOpacity: 0.24,
+    shadowRadius: 7,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  finishBtnPressed: {
+    opacity: 0.9,
+  },
+  finishBtnPulse: {
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+  },
+  finishBtnDisabled: {
+    opacity: 0.55,
+  },
+  finishBtnText: {
+    color: SV.black,
+    fontSize: 16,
+    fontWeight: '800',
     textAlign: 'center',
   },
 });

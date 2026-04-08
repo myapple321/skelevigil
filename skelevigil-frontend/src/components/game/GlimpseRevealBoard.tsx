@@ -18,6 +18,10 @@ type Props = {
   showTiles: boolean;
   /** If set, animate the given tile as a "fail" shatter and disable further taps. */
   failedIndex?: number | null;
+  /** 0..1 while system scan runs; null when idle. */
+  scanProgress?: number | null;
+  /** Increment to trigger success heartbeat pulse on neural blocks. */
+  successPulseToken?: number;
   size?: number;
   matPadding?: number;
   cellGap?: number;
@@ -34,6 +38,8 @@ export function GlimpseRevealBoard({
   neuralBlocks,
   showTiles,
   failedIndex = null,
+  scanProgress = null,
+  successPulseToken = 0,
   size = GLIMPSE_PREVIEW_SIZE,
   matPadding = GLIMPSE_GRID_INSET,
   cellGap = GLIMPSE_CELL_GAP,
@@ -42,6 +48,10 @@ export function GlimpseRevealBoard({
 }: Props) {
   const neuralTileSet = new Set(neuralBlocks.map(neuralBlockToTileIndex));
   const failAnim = useFailAnim(failedIndex);
+  const heartbeatAnim = useSuccessPulse(successPulseToken);
+  const playFieldSize = Math.max(0, size - matPadding * 2);
+  const scanTopPx =
+    scanProgress == null ? null : Math.min(1, Math.max(0, scanProgress)) * playFieldSize;
 
   return (
     <View style={[styles.artFrame, { width: size, height: size }]}>
@@ -60,14 +70,22 @@ export function GlimpseRevealBoard({
                         style={[
                           styles.neuralCell,
                           isNeural ? styles.neuralCellOn : styles.neuralCellOff,
-                        ]}
-                      />
+                        ]}>
+                        {isNeural ? (
+                          <Animated.View pointerEvents="none" style={[styles.neuralPulseFill, heartbeatAnim]} />
+                        ) : null}
+                      </View>
                     </View>
                   );
                 })}
               </View>
             ))}
           </View>
+          {scanTopPx != null ? (
+            <View pointerEvents="none" style={[styles.scanSweepWrap, { top: scanTopPx }]}>
+              <View style={styles.scanSweepCore} />
+            </View>
+          ) : null}
           {showTiles ? (
             <View
               style={[styles.tileLayer, { gap: cellGap }]}
@@ -153,6 +171,7 @@ const styles = StyleSheet.create({
   neuralCell: {
     flex: 1,
     borderRadius: 2,
+    overflow: 'hidden',
   },
   neuralCellOff: {
     backgroundColor: 'transparent',
@@ -161,6 +180,27 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,255,255,0.14)',
     borderWidth: 2,
     borderColor: SV.neonCyan,
+  },
+  neuralPulseFill: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,255,255,0.28)',
+  },
+  scanSweepWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    marginTop: -6,
+    zIndex: 3,
+    elevation: 10,
+    alignItems: 'stretch',
+  },
+  scanSweepCore: {
+    height: 12,
+    backgroundColor: 'rgba(0,255,255,0.68)',
+    shadowColor: SV.neonCyan,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
   },
   cell: {
     flex: 1,
@@ -220,4 +260,33 @@ function useFailAnim(failedIndex: number | null): any {
     opacity,
     transform: [{ translateX: shake }, { rotate: rot }, { scale }],
   };
+}
+
+function useSuccessPulse(successPulseToken: number): any {
+  const beatRef = useRef(new Animated.Value(0));
+  const prevTokenRef = useRef(successPulseToken);
+
+  useEffect(() => {
+    if (successPulseToken === prevTokenRef.current) return;
+    prevTokenRef.current = successPulseToken;
+    const p = beatRef.current;
+    p.setValue(0);
+    Animated.sequence([
+      Animated.timing(p, { toValue: 1, duration: 230, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(p, { toValue: 0, duration: 230, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      Animated.timing(p, { toValue: 1, duration: 230, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(p, { toValue: 0, duration: 260, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+    ]).start();
+  }, [successPulseToken]);
+
+  const p = beatRef.current;
+  const opacity = p.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.9],
+  });
+  const scale = p.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.1],
+  });
+  return { opacity, transform: [{ scale }] };
 }
