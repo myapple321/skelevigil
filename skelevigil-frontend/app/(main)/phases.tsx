@@ -11,13 +11,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 
+import { GlimpseBlockGrid } from '@/src/components/game/GlimpseBlockGrid';
+import { buildGlimpseGreyPalette } from '@/src/game/glimpsePalette';
 import { SV } from '@/src/theme/skelevigil';
 
 const INFO_SOON_MESSAGE = 'The information will be available soon.';
 
 const ART_SIZE = 132;
-const GRID_INSET = 8;
-const CELL_GAP = 3;
 
 /** Phase CTA fills — distinct from the default neon cyan tab chrome. */
 const PHASE_BTN = {
@@ -26,45 +26,9 @@ const PHASE_BTN = {
   tranceLightOrange: '#F5BF8A',
 } as const;
 
-/** 25 evenly spaced grey steps (light → dark) for the 5×5 “Glimpse” grid. */
-function useGlimpseGreys(): string[] {
-  return useMemo(() => {
-    const light = 244;
-    const dark = 62;
-    return Array.from({ length: 25 }, (_, i) => {
-      const t = i / 24;
-      const v = Math.round(light + (dark - light) * t);
-      return `rgb(${v},${v},${v})`;
-    });
-  }, []);
-}
-
-function GlimpseGridArt() {
-  const greys = useGlimpseGreys();
-  return (
-    <View style={styles.artFrame}>
-      <View style={styles.glimpseMat}>
-        <View style={styles.glimpseGrid}>
-          {[0, 1, 2, 3, 4].map((row) => (
-            <View key={row} style={styles.glimpseRow}>
-              {[0, 1, 2, 3, 4].map((col) => {
-                const idx = row * 5 + col;
-                return (
-                  <View
-                    key={col}
-                    style={[
-                      styles.glimpseCell,
-                      { backgroundColor: greys[idx] ?? SV.muted },
-                    ]}
-                  />
-                );
-              })}
-            </View>
-          ))}
-        </View>
-      </View>
-    </View>
-  );
+function GlimpsePhasesPreview() {
+  const colors = useMemo(() => buildGlimpseGreyPalette(), []);
+  return <GlimpseBlockGrid colors={colors} size={ART_SIZE} />;
 }
 
 function PlaceholderArt() {
@@ -129,7 +93,7 @@ export default function PhasesScreen() {
         <View style={styles.section}>
           <Text style={styles.levelTitle}>The Glimpse</Text>
           <View style={styles.row}>
-            <GlimpseGridArt />
+            <GlimpsePhasesPreview />
             <View style={styles.actionColumn}>
               <View style={styles.actionRow}>
                 <Pressable
@@ -300,29 +264,6 @@ const styles = StyleSheet.create({
     height: ART_SIZE,
     borderRadius: 6,
     overflow: 'hidden',
-  },
-  glimpseMat: {
-    flex: 1,
-    backgroundColor: '#EFEFEF',
-    padding: GRID_INSET,
-  },
-  glimpseGrid: {
-    flex: 1,
-    gap: CELL_GAP,
-  },
-  glimpseRow: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: CELL_GAP,
-  },
-  glimpseCell: {
-    flex: 1,
-    borderRadius: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 1.5,
-    elevation: 1,
   },
   placeholderArt: {
     backgroundColor: '#FFFFFF',
