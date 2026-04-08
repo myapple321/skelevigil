@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useRouter } from 'expo-router';
 
 import { SV } from '@/src/theme/skelevigil';
 
@@ -75,6 +76,7 @@ function PlaceholderArt() {
 }
 
 export default function PhasesScreen() {
+  const router = useRouter();
   const [infoModalVisible, setInfoModalVisible] = useState(false);
 
   return (
@@ -131,7 +133,7 @@ export default function PhasesScreen() {
             <View style={styles.actionColumn}>
               <View style={styles.actionRow}>
                 <Pressable
-                  onPress={() => {}}
+                  onPress={() => router.push('/(main)/vigil')}
                   style={({ pressed }) => [
                     styles.playBtn,
                     styles.playBtnFlex,
