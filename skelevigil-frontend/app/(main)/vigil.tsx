@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -18,7 +18,10 @@ import { playTileRevealSfx } from '@/src/audio/tileRevealSfx';
 import { GlimpseRevealBoard } from '@/src/components/game/GlimpseRevealBoard';
 import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
 import { shuffledGlimpseGreyPalette } from '@/src/game/glimpsePalette';
+import { generateRandomNeuralBlocks } from '@/src/game/neuralString';
 import { SV } from '@/src/theme/skelevigil';
+
+const MEMORIZE_MS = 5000;
 
 export default function VigilScreen() {
   const { sfxEnabled } = useSfxPreference();
@@ -28,6 +31,10 @@ export default function VigilScreen() {
   const matPadding = Math.max(6, Math.round(GLIMPSE_GRID_INSET * scale));
   const cellGap = Math.max(2, Math.round(GLIMPSE_CELL_GAP * scale));
 
+  const [neuralBlocks, setNeuralBlocks] = useState(() => generateRandomNeuralBlocks());
+  const [phase, setPhase] = useState<'memorize' | 'play'>('memorize');
+  const [memorizeSecondsLeft, setMemorizeSecondsLeft] = useState(5);
+
   const [gridColors, setGridColors] = useState(() => shuffledGlimpseGreyPalette());
   const [revealed, setRevealed] = useState<boolean[]>(() =>
     Array.from({ length: 25 }, () => false),
@@ -35,7 +42,26 @@ export default function VigilScreen() {
   const revealedRef = useRef(revealed);
   revealedRef.current = revealed;
 
+  useEffect(() => {
+    setPhase('memorize');
+    setMemorizeSecondsLeft(5);
+    const tick = setInterval(() => {
+      setMemorizeSecondsLeft((s) => (s <= 1 ? 0 : s - 1));
+    }, 1000);
+    const done = setTimeout(() => {
+      clearInterval(tick);
+      setPhase('play');
+    }, MEMORIZE_MS);
+    return () => {
+      clearInterval(tick);
+      clearTimeout(done);
+    };
+  }, [neuralBlocks]);
+
   const startNewGame = () => {
+    setPhase('memorize');
+    setMemorizeSecondsLeft(5);
+    setNeuralBlocks(generateRandomNeuralBlocks());
     setGridColors(shuffledGlimpseGreyPalette());
     const fresh = Array.from({ length: 25 }, () => false);
     revealedRef.current = fresh;
@@ -59,10 +85,17 @@ export default function VigilScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>The Glimpse</Text>
+        <Text style={[styles.title, phase === 'play' && styles.titlePlaySpacing]}>The Glimpse</Text>
+        {phase === 'memorize' ? (
+          <Text style={styles.memorizeHint} accessibilityLiveRegion="polite">
+            Memorize the neural blocks. Tiles return in {memorizeSecondsLeft}s.
+          </Text>
+        ) : null}
         <View style={styles.gridWrap}>
           <GlimpseRevealBoard
             colors={gridColors}
+            neuralBlocks={neuralBlocks}
+            showTiles={phase === 'play'}
             size={gridSize}
             matPadding={matPadding}
             cellGap={cellGap}
@@ -101,8 +134,21 @@ const styles = StyleSheet.create({
     color: SV.surgicalWhite,
     fontSize: 20,
     fontWeight: '700',
-    marginBottom: 20,
+    marginBottom: 12,
     textAlign: 'center',
+  },
+  titlePlaySpacing: {
+    marginBottom: 20,
+  },
+  memorizeHint: {
+    color: SV.neonCyan,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    maxWidth: 340,
   },
   gridWrap: {
     alignItems: 'center',
