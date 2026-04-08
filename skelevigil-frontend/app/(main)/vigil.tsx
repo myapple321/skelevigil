@@ -227,9 +227,19 @@ export default function VigilScreen() {
             The Strand has shattered. Tap 'New Game' to try a fresh grid.
           </Text>
         ) : phase === 'play' ? (
-          <Text style={styles.playTimerHint} accessibilityLiveRegion="polite">
-            Excavation time remaining: {playSecondsLeft}s
-          </Text>
+          <View
+            style={styles.excavationBarWrap}
+            accessibilityLabel={`Excavation time, ${playSecondsLeft} seconds remaining`}
+            accessibilityLiveRegion="polite">
+            <View style={styles.excavationBarTrack}>
+              <View
+                style={[
+                  styles.excavationBarFill,
+                  { width: `${(playSecondsLeft / PLAY_TIME_SEC) * 100}%` },
+                ]}
+              />
+            </View>
+          </View>
         ) : null}
         <View style={styles.gridWrap}>
           <GlimpseRevealBoard
@@ -238,6 +248,13 @@ export default function VigilScreen() {
             showTiles={phase === 'play'}
             failedIndex={failedIndex}
             timedOut={timedOut}
+            excavationPressureFraction={
+              phase === 'play' && failedIndex == null && !passedExcavation
+                ? timedOut
+                  ? 1
+                  : (PLAY_TIME_SEC - playSecondsLeft) / PLAY_TIME_SEC
+                : null
+            }
             scanProgress={scanProgress}
             successPulseToken={successPulseToken}
             size={gridSize}
@@ -343,15 +360,30 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,191,0,0.35)',
     maxWidth: 360,
   },
-  playTimerHint: {
-    color: SV.muted,
-    fontSize: 13,
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 16,
-    paddingHorizontal: 12,
+  excavationBarWrap: {
+    width: '100%',
     maxWidth: 360,
+    paddingHorizontal: 0,
+    marginBottom: 16,
+    alignSelf: 'center',
+  },
+  excavationBarTrack: {
+    width: '100%',
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(0,255,255,0.1)',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,255,0.28)',
+  },
+  excavationBarFill: {
+    height: '100%',
+    borderRadius: 2,
+    backgroundColor: SV.neonCyan,
+    shadowColor: SV.neonCyan,
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
   },
   failHint: {
     color: '#FFC68A',

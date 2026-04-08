@@ -20,6 +20,8 @@ type Props = {
   failedIndex?: number | null;
   /** Excavation time expired: dim tiles / signal-loss overlay. */
   timedOut?: boolean;
+  /** 0..1 pressure toward deadline; tiles dim progressively (signal loss). Null = off. */
+  excavationPressureFraction?: number | null;
   /** 0..1 while system scan runs; null when idle. */
   scanProgress?: number | null;
   /** Increment to trigger success heartbeat pulse on neural blocks. */
@@ -41,6 +43,7 @@ export function GlimpseRevealBoard({
   showTiles,
   failedIndex = null,
   timedOut = false,
+  excavationPressureFraction = null,
   scanProgress = null,
   successPulseToken = 0,
   size = GLIMPSE_PREVIEW_SIZE,
@@ -56,6 +59,8 @@ export function GlimpseRevealBoard({
   const playFieldSize = Math.max(0, size - matPadding * 2);
   const scanTopPx =
     scanProgress == null ? null : Math.min(1, Math.max(0, scanProgress)) * playFieldSize;
+  const pressure = excavationPressureFraction == null ? 0 : Math.min(1, Math.max(0, excavationPressureFraction));
+  const pressureOpacity = pressure * 0.76;
 
   return (
     <View style={[styles.artFrame, { width: size, height: size }]}>
@@ -85,11 +90,6 @@ export function GlimpseRevealBoard({
               </View>
             ))}
           </View>
-          {scanTopPx != null ? (
-            <View pointerEvents="none" style={[styles.scanSweepWrap, { top: scanTopPx }]}>
-              <View style={styles.scanSweepCore} />
-            </View>
-          ) : null}
           {showTiles ? (
             <View
               style={[styles.tileLayer, { gap: cellGap }]}
@@ -129,6 +129,17 @@ export function GlimpseRevealBoard({
                   })}
                 </View>
               ))}
+            </View>
+          ) : null}
+          {showTiles && excavationPressureFraction != null && pressureOpacity > 0 ? (
+            <View
+              pointerEvents="none"
+              style={[styles.signalPressureOverlay, { opacity: pressureOpacity }]}
+            />
+          ) : null}
+          {scanTopPx != null ? (
+            <View pointerEvents="none" style={[styles.scanSweepWrap, { top: scanTopPx }]}>
+              <View style={styles.scanSweepCore} />
             </View>
           ) : null}
           {showTiles && timedOut ? (
@@ -173,7 +184,7 @@ const styles = StyleSheet.create({
   },
   signalLossOverlay: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 4,
+    zIndex: 6,
     elevation: 12,
     backgroundColor: SV.black,
   },
@@ -201,13 +212,19 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,255,255,0.28)',
   },
+  signalPressureOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 4,
+    elevation: 10,
+    backgroundColor: SV.black,
+  },
   scanSweepWrap: {
     position: 'absolute',
     left: 0,
     right: 0,
     marginTop: -6,
-    zIndex: 3,
-    elevation: 10,
+    zIndex: 5,
+    elevation: 11,
     alignItems: 'stretch',
   },
   scanSweepCore: {
@@ -287,7 +304,7 @@ function useSignalLossOverlay(active: boolean): Animated.Value {
       prevRef.current = true;
       opacity.setValue(0);
       Animated.timing(opacity, {
-        toValue: 0.92,
+        toValue: 0.34,
         duration: 720,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
