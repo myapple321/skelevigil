@@ -285,7 +285,11 @@ export default function SystemIndexScreen() {
         </View>
 
         <View style={styles.debugWrap}>
-          <Text style={styles.debugTitle}>DEBUG</Text>
+          <View style={styles.debugDividerRow}>
+            <View style={styles.debugDividerLine} />
+            <Text style={styles.debugTitle}>DEBUG</Text>
+            <View style={styles.debugDividerLine} />
+          </View>
           <Pressable
             onPress={debugBuyThreeVaultCredits}
             style={({ pressed }) => [styles.debugBuyBtn, pressed && styles.debugBuyPressed]}>
@@ -407,12 +411,26 @@ const styles = StyleSheet.create({
     marginTop: 18,
     alignItems: 'center',
     gap: 10,
+    alignSelf: 'stretch',
+  },
+  debugDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    gap: 12,
+  },
+  debugDividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    minHeight: 1,
+    backgroundColor: 'rgba(0,255,255,0.45)',
   },
   debugTitle: {
-    color: SV.muted,
-    fontSize: 11,
+    color: 'rgba(240,240,240,0.82)',
+    fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
+    paddingHorizontal: 4,
   },
   debugBuyBtn: {
     minWidth: 260,
