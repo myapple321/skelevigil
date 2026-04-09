@@ -5,7 +5,7 @@ import {
   getReactNativePersistence,
   initializeAuth,
 } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, type Firestore } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { firebaseConfig } from '@/src/firebase/firebaseConfig';
@@ -35,6 +35,14 @@ export function getFirebaseAuth(): Auth {
 
 export function getFirebaseFirestore(): Firestore {
   if (firestoreSingleton) return firestoreSingleton;
-  firestoreSingleton = getFirestore(getFirebaseApp());
+  const app = getFirebaseApp();
+  try {
+    // WebChannel Listen streams often log transport warnings on iOS/RN; long polling is more stable.
+    firestoreSingleton = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+    });
+  } catch {
+    firestoreSingleton = getFirestore(app);
+  }
   return firestoreSingleton;
 }
