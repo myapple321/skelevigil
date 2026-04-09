@@ -287,7 +287,7 @@ export default function LoginLandingScreen() {
             </>
           )}
         </View>
-        <AuthFooter onHelpPress={() => {}} />
+        <AuthFooter onHelpPress={() => router.push('/(auth)/login-help')} />
       </ScrollView>
     </SafeAreaView>
   );

@@ -91,7 +91,7 @@ export default function CreateAccountScreen() {
           style={styles.cta}
           disabled={busy}
         />
-        <AuthFooter onHelpPress={() => {}} />
+        <AuthFooter onHelpPress={() => router.push('/(auth)/login-help')} />
       </ScrollView>
     </SafeAreaView>
   );

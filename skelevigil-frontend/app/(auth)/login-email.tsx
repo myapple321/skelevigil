@@ -177,7 +177,7 @@ export default function LoginEmailScreen() {
         <Pressable style={styles.signUpWrap} onPress={() => router.push('/(auth)/create-account')}>
           <Text style={styles.signUp}>Create an account</Text>
         </Pressable>
-        <AuthFooter onHelpPress={() => {}} />
+        <AuthFooter onHelpPress={() => router.push('/(auth)/login-help')} />
       </ScrollView>
     </SafeAreaView>
   );
