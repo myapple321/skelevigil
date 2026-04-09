@@ -22,7 +22,12 @@ export function mapAuthErrorMessage(error: unknown): string {
       case 'auth/weak-password':
         return 'Password should be at least 6 characters.';
       case 'auth/operation-not-allowed':
-        return 'Email sign-in is not enabled for this project.';
+        return 'This sign-in method is not enabled for this project.';
+      case 'auth/admin-restricted-operation':
+        return (
+          'Guest sign-in (anonymous auth) is turned off or restricted for this Firebase project.\n\n' +
+          'In Firebase Console: Authentication → Sign-in methods → enable Anonymous. Then try again.'
+        );
       case 'auth/account-exists-with-different-credential':
         return 'An account already exists with this email using another sign-in method. Use that method, or complete linking when prompted.';
       case 'auth/requires-recent-login':

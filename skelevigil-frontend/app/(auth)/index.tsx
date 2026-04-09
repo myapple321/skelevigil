@@ -6,6 +6,7 @@ import { FirebaseError } from 'firebase/app';
 import {
   GoogleAuthProvider,
   linkWithCredential,
+  signInAnonymously,
   signInWithCredential,
   signInWithEmailAndPassword,
   type AuthCredential,
@@ -49,6 +50,10 @@ export default function LoginLandingScreen() {
   const [googleLinkError, setGoogleLinkError] = useState<string | null>(null);
   const [googleLinkBusy, setGoogleLinkBusy] = useState(false);
   const pendingGoogleLinkCredRef = useRef<AuthCredential | null>(null);
+
+  const [guestAlertOpen, setGuestAlertOpen] = useState(false);
+  const [guestBusy, setGuestBusy] = useState(false);
+  const [guestError, setGuestError] = useState<string | null>(null);
 
   const webId = GOOGLE_OAUTH_CLIENT_IDS.webClientId;
   const iosId = GOOGLE_OAUTH_CLIENT_IDS.iosClientId;
@@ -175,6 +180,26 @@ export default function LoginLandingScreen() {
     setGoogleLinkError(null);
   };
 
+  const closeGuestAlert = () => {
+    if (guestBusy) return;
+    setGuestAlertOpen(false);
+    setGuestError(null);
+  };
+
+  const onGuestUnderstand = async () => {
+    setGuestError(null);
+    setGuestBusy(true);
+    try {
+      await signInAnonymously(getFirebaseAuth());
+      setGuestAlertOpen(false);
+      router.replace('/(main)/phases');
+    } catch (e) {
+      setGuestError(mapAuthErrorMessage(e));
+    } finally {
+      setGuestBusy(false);
+    }
+  };
+
   const onConfirmGoogleLink = async () => {
     const pwd = googleLinkPassword;
     if (!pwd) {
@@ -210,6 +235,34 @@ export default function LoginLandingScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <Modal
+        visible={guestAlertOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={closeGuestAlert}>
+        <Pressable style={styles.modalBackdrop} onPress={closeGuestAlert}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Welcome!</Text>
+            <Text style={styles.modalBody}>
+              You can play now without an account. Please note: Your progress is saved only on this
+              device. If you delete the app, your Vault Credits cannot be recovered.
+
+              {'\n\n'}Guests can’t purchase Vault Credits. Log in with Email, Apple, or Google to
+              purchase.
+            </Text>
+            {guestError ? <Text style={styles.modalErr}>{guestError}</Text> : null}
+            <SvButton
+              title={guestBusy ? 'Signing in…' : 'I Understand'}
+              onPress={() => void onGuestUnderstand()}
+              disabled={guestBusy}
+              style={styles.modalPrimary}
+            />
+            <Pressable onPress={closeGuestAlert} style={styles.modalCancelWrap} disabled={guestBusy}>
+              <Text style={[styles.modalCancel, guestBusy && styles.modalCancelDisabled]}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
       <Modal
         visible={googleLinkOpen}
         transparent
@@ -286,6 +339,19 @@ export default function LoginLandingScreen() {
               {googleError ? <Text style={styles.oauthError}>{googleError}</Text> : null}
             </>
           )}
+          <Pressable
+            onPress={() => {
+              setGuestError(null);
+              setGuestAlertOpen(true);
+            }}
+            style={({ pressed }) => [
+              styles.guestButton,
+              pressed && styles.guestButtonPressed,
+              (googleBusy || appleBusy) && styles.guestButtonDisabled,
+            ]}
+            disabled={googleBusy || appleBusy}>
+            <Text style={styles.guestButtonText}>Log in as Guest</Text>
+          </Pressable>
         </View>
         <AuthFooter onHelpPress={() => router.push('/(auth)/login-help')} />
       </ScrollView>
@@ -323,6 +389,28 @@ const styles = StyleSheet.create({
   actions: {
     gap: 14,
     marginBottom: 32,
+  },
+  guestButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: SV.neonCyan,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guestButtonPressed: {
+    opacity: 0.85,
+  },
+  guestButtonDisabled: {
+    opacity: 0.45,
+  },
+  guestButtonText: {
+    color: SV.neonCyan,
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   oauthError: {
     color: '#FF6B6B',
@@ -376,5 +464,8 @@ const styles = StyleSheet.create({
     color: SV.neonCyan,
     fontSize: 15,
     fontWeight: '600',
+  },
+  modalCancelDisabled: {
+    opacity: 0.45,
   },
 });
