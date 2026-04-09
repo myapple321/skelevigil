@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
+import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
 import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
 import { mapAuthErrorMessage } from '@/src/firebase/mapAuthError';
 import { SV } from '@/src/theme/skelevigil';
@@ -108,6 +109,7 @@ export default function SystemIndexScreen() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteNeedsRecentSignIn, setDeleteNeedsRecentSignIn] = useState(false);
+  const { debugBuyThreeVaultCredits } = useVaultProgress();
 
   const closeDeleteModal = () => {
     if (deleteBusy) return;
@@ -281,6 +283,15 @@ export default function SystemIndexScreen() {
             <Text style={styles.logoutText}>Logout</Text>
           </Pressable>
         </View>
+
+        <View style={styles.debugWrap}>
+          <Text style={styles.debugTitle}>DEBUG</Text>
+          <Pressable
+            onPress={debugBuyThreeVaultCredits}
+            style={({ pressed }) => [styles.debugBuyBtn, pressed && styles.debugBuyPressed]}>
+            <Text style={styles.debugBuyText}>Buy 3 Vault Credits - $0.99</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -391,6 +402,37 @@ const styles = StyleSheet.create({
     color: SV.mediumOrange,
     fontSize: 16,
     fontWeight: '700',
+  },
+  debugWrap: {
+    marginTop: 18,
+    alignItems: 'center',
+    gap: 10,
+  },
+  debugTitle: {
+    color: SV.muted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  debugBuyBtn: {
+    minWidth: 260,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,255,0.55)',
+    backgroundColor: 'rgba(0,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  debugBuyPressed: {
+    opacity: 0.85,
+  },
+  debugBuyText: {
+    color: SV.neonCyan,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   modalBackdrop: {
     flex: 1,

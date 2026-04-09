@@ -4,19 +4,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
 import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
 import { SV } from '@/src/theme/skelevigil';
 
-const SUCCESS_CREDITS = 10;
-
-const ATTEMPTS_LEFT = {
-  glimpse: 3,
-  stare: 2,
-  trance: 1,
-} as const;
-
 export default function VaultScreen() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => getFirebaseAuth().currentUser);
+  const { progress, hydrated } = useVaultProgress();
 
   useEffect(() => {
     const unsub = onAuthStateChanged(getFirebaseAuth(), (user) => setCurrentUser(user));
@@ -60,14 +54,17 @@ export default function VaultScreen() {
           <Text style={styles.sectionTitle}>Vault Status</Text>
           <View style={styles.trackingBox}>
             <Text style={styles.trackingTitle}>Failure Tracking (Attempts Left)</Text>
-            <Text style={styles.trackingLine}>Glimpse: {ATTEMPTS_LEFT.glimpse}</Text>
-            <Text style={styles.trackingLine}>Stare: {ATTEMPTS_LEFT.stare}</Text>
-            <Text style={styles.trackingLine}>Trance: {ATTEMPTS_LEFT.trance}</Text>
+            <Text style={styles.trackingLine}>Glimpse: {progress.attemptsLeft.glimpse}</Text>
+            <Text style={styles.trackingLine}>Stare: {progress.attemptsLeft.stare}</Text>
+            <Text style={styles.trackingLine}>Trance: {progress.attemptsLeft.trance}</Text>
           </View>
           <View style={[styles.trackingBox, styles.creditsBox]}>
-            <Text style={styles.successValue}>{SUCCESS_CREDITS} Credits toward Free Mission</Text>
-            <Text style={styles.trackingLine}>Successful Mission: 0</Text>
+            <Text style={styles.successValue}>
+              {progress.creditsTowardFreeMission} Credits toward Free Mission
+            </Text>
+            <Text style={styles.trackingLine}>Successful Mission: {progress.successfulMissions}</Text>
           </View>
+          {!hydrated ? <Text style={styles.syncHint}>Syncing local mission data...</Text> : null}
         </View>
 
         <View style={[styles.section, styles.purchaseSection]}>
@@ -142,6 +139,12 @@ const styles = StyleSheet.create({
   },
   creditsBox: {
     marginTop: 12,
+  },
+  syncHint: {
+    marginTop: 10,
+    color: SV.muted,
+    fontSize: 12,
+    textAlign: 'center',
   },
   purchaseSection: {
     alignItems: 'center',

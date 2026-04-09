@@ -19,6 +19,7 @@ import { playTileFailSfx } from '@/src/audio/tileFailSfx';
 import { playTileRevealSfx } from '@/src/audio/tileRevealSfx';
 import { GlimpseRevealBoard } from '@/src/components/game/GlimpseRevealBoard';
 import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
+import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
 import { shuffledGlimpseGreyPalette } from '@/src/game/glimpsePalette';
 import { generateRandomNeuralBlocks, neuralBlockToTileIndex } from '@/src/game/neuralBlocks';
 import { SV } from '@/src/theme/skelevigil';
@@ -30,6 +31,7 @@ const TIMEOUT_AMBER = '#FFBF00';
 
 export default function VigilScreen() {
   const { sfxEnabled } = useSfxPreference();
+  const { progress, recordGlimpseFailure, recordGlimpseSuccess } = useVaultProgress();
   const { width } = useWindowDimensions();
   const gridSize = Math.min(Math.max(width - 40, 220), 360);
   const scale = gridSize / GLIMPSE_PREVIEW_SIZE;
@@ -55,9 +57,33 @@ export default function VigilScreen() {
   revealedRef.current = revealed;
   const finishScanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timedOutRef = useRef(timedOut);
+  const outcomeCommittedRef = useRef(false);
   timedOutRef.current = timedOut;
+  const glimpseLocked = progress.attemptsLeft.glimpse <= 0;
+
+  const commitMissionSuccess = () => {
+    if (outcomeCommittedRef.current) return;
+    outcomeCommittedRef.current = true;
+    recordGlimpseSuccess();
+  };
+
+  const commitMissionFailure = () => {
+    if (outcomeCommittedRef.current) return;
+    outcomeCommittedRef.current = true;
+    recordGlimpseFailure();
+  };
 
   useEffect(() => {
+    outcomeCommittedRef.current = false;
+    if (glimpseLocked) {
+      setPhase('play');
+      setMemorizeSecondsLeft(0);
+      setFailedIndex(null);
+      setTimedOut(false);
+      setPassedExcavation(false);
+      setPlaySecondsLeft(PLAY_TIME_SEC);
+      return;
+    }
     setPhase('memorize');
     setMemorizeSecondsLeft(5);
     setFailedIndex(null);
@@ -74,9 +100,10 @@ export default function VigilScreen() {
       clearInterval(tick);
       clearTimeout(done);
     };
-  }, [neuralBlocks]);
+  }, [neuralBlocks, glimpseLocked]);
 
   useEffect(() => {
+    if (glimpseLocked) return;
     if (phase !== 'play') return;
     if (failedIndex != null || passedExcavation || timedOut) return;
 
@@ -96,9 +123,16 @@ export default function VigilScreen() {
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [phase, neuralBlocks, failedIndex, passedExcavation, timedOut]);
+  }, [phase, neuralBlocks, failedIndex, passedExcavation, timedOut, glimpseLocked]);
+
+  useEffect(() => {
+    if (!timedOut) return;
+    commitMissionFailure();
+  }, [timedOut]);
 
   const startNewGame = () => {
+    if (glimpseLocked) return;
+    outcomeCommittedRef.current = false;
     setPhase('memorize');
     setMemorizeSecondsLeft(5);
     setNeuralBlocks(generateRandomNeuralBlocks());
@@ -118,6 +152,7 @@ export default function VigilScreen() {
   };
 
   const onRevealCell = (index: number) => {
+    if (glimpseLocked) return;
     if (phase !== 'play') return;
     if (failedIndex != null || timedOut) return;
     if (revealedRef.current[index]) return;
@@ -127,6 +162,7 @@ export default function VigilScreen() {
       setFailedIndex(index);
       setTimedOut(false);
       setPassedExcavation(false);
+      commitMissionFailure();
       if (sfxEnabled) void playTileFailSfx();
       return;
     }
@@ -153,6 +189,7 @@ export default function VigilScreen() {
   };
 
   const onFinishExcavation = () => {
+    if (glimpseLocked) return;
     if (phase !== 'play') return;
     if (failedIndex != null || timedOut) return;
     if (scanProgress != null) return;
@@ -188,6 +225,7 @@ export default function VigilScreen() {
         if (success) {
           setPassedExcavation(true);
           setSuccessPulseToken((n) => n + 1);
+          commitMissionSuccess();
           const fullyRevealed = Array.from({ length: 25 }, () => true);
           revealedRef.current = fullyRevealed;
           setRevealed(fullyRevealed);
@@ -198,6 +236,7 @@ export default function VigilScreen() {
         setFailedIndex(firstNeuralIdx);
         setTimedOut(false);
         setPassedExcavation(false);
+        commitMissionFailure();
         if (sfxEnabled) void playTileFailSfx();
       }
     }, 16);
@@ -210,7 +249,11 @@ export default function VigilScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
         <Text style={[styles.title, phase === 'play' && styles.titlePlaySpacing]}>The Glimpse</Text>
-        {phase === 'memorize' ? (
+        {glimpseLocked ? (
+          <Text style={styles.lockedHint} accessibilityLiveRegion="polite">
+            Glimpse attempts are depleted. Buy 3 Vault Credits to continue this mission.
+          </Text>
+        ) : phase === 'memorize' ? (
           <Text style={styles.memorizeHint} accessibilityLiveRegion="polite">
             Memorize the neural blocks. Tiles return in {memorizeSecondsLeft}s.
           </Text>
@@ -274,9 +317,11 @@ export default function VigilScreen() {
           </Pressable>
           <Pressable
             onPress={startNewGame}
+            disabled={glimpseLocked}
             style={({ pressed }) => [
               styles.newGameBtn,
               pressed && styles.newGameBtnPressed,
+              glimpseLocked && styles.newGameBtnDisabled,
             ]}
             accessibilityRole="button"
             accessibilityLabel="New mission, shuffle the grid">
@@ -294,13 +339,17 @@ export default function VigilScreen() {
           <Pressable
             onPress={onFinishExcavation}
             disabled={
-              phase !== 'play' || failedIndex != null || timedOut || scanProgress != null
+              glimpseLocked || phase !== 'play' || failedIndex != null || timedOut || scanProgress != null
             }
             style={({ pressed }) => [
               styles.finishBtn,
               pressed && styles.finishBtnPressed,
               finishPulse && styles.finishBtnPulse,
-              (phase !== 'play' || failedIndex != null || timedOut || scanProgress != null) &&
+              (glimpseLocked ||
+                phase !== 'play' ||
+                failedIndex != null ||
+                timedOut ||
+                scanProgress != null) &&
                 styles.finishBtnDisabled,
             ]}
             accessibilityRole="button"
@@ -344,6 +393,21 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingHorizontal: 12,
     maxWidth: 340,
+  },
+  lockedHint: {
+    color: '#FFC68A',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255,138,0,0.12)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,138,0,0.35)',
+    maxWidth: 360,
   },
   timeoutHint: {
     color: TIMEOUT_AMBER,
@@ -453,6 +517,9 @@ const styles = StyleSheet.create({
   },
   newGameBtnPressed: {
     opacity: 0.88,
+  },
+  newGameBtnDisabled: {
+    opacity: 0.55,
   },
   newGameBtnText: {
     color: SV.surgicalWhite,
