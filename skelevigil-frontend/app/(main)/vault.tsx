@@ -9,6 +9,13 @@ import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
 import { FREE_MISSION_CREDIT_ALLOWANCE } from '@/src/preferences/vaultProgress';
 import { SV } from '@/src/theme/skelevigil';
 
+/** Same fills as Phases screen Play now buttons (`PHASE_BTN` in phases.tsx). */
+const PHASE_RESERVE_LABEL_COLOR = {
+  glimpseGrey: '#8A8E91',
+  stareTeal: '#0E9595',
+  tranceLightOrange: '#F5BF8A',
+} as const;
+
 export default function VaultScreen() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => getFirebaseAuth().currentUser);
   const { progress, hydrated } = useVaultProgress();
@@ -55,9 +62,15 @@ export default function VaultScreen() {
           <Text style={styles.sectionTitle}>Vault Scoreboard</Text>
           <View style={styles.trackingBox}>
             <Text style={styles.trackingTitle}>Mission Reserves Available</Text>
-            <Text style={styles.trackingLine}>Glimpse Phase: {progress.attemptsLeft.glimpse}</Text>
-            <Text style={styles.trackingLine}>Stare Phase: {progress.attemptsLeft.stare}</Text>
-            <Text style={styles.trackingLine}>Trance Phase: {progress.attemptsLeft.trance}</Text>
+            <Text style={[styles.trackingLine, { color: PHASE_RESERVE_LABEL_COLOR.glimpseGrey }]}>
+              Glimpse Phase: {progress.attemptsLeft.glimpse}
+            </Text>
+            <Text style={[styles.trackingLine, { color: PHASE_RESERVE_LABEL_COLOR.stareTeal }]}>
+              Stare Phase: {progress.attemptsLeft.stare}
+            </Text>
+            <Text style={[styles.trackingLine, { color: PHASE_RESERVE_LABEL_COLOR.tranceLightOrange }]}>
+              Trance Phase: {progress.attemptsLeft.trance}
+            </Text>
           </View>
           <View style={[styles.trackingBox, styles.restorationBox]}>
             <Text style={styles.restorationLabel}>Progress to Free Restoration</Text>
