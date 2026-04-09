@@ -120,8 +120,9 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     padding: 24,
+    gap: 10,
   },
   section: {
     width: '100%',
