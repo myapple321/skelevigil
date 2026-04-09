@@ -5,6 +5,7 @@ import {
   getReactNativePersistence,
   initializeAuth,
 } from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { firebaseConfig } from '@/src/firebase/firebaseConfig';
@@ -17,6 +18,7 @@ function getFirebaseApp() {
 }
 
 let authSingleton: Auth | null = null;
+let firestoreSingleton: Firestore | null = null;
 
 export function getFirebaseAuth(): Auth {
   if (authSingleton) return authSingleton;
@@ -29,4 +31,10 @@ export function getFirebaseAuth(): Auth {
     authSingleton = getAuth(app);
   }
   return authSingleton;
+}
+
+export function getFirebaseFirestore(): Firestore {
+  if (firestoreSingleton) return firestoreSingleton;
+  firestoreSingleton = getFirestore(getFirebaseApp());
+  return firestoreSingleton;
 }

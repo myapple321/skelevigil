@@ -1,12 +1,48 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { FirebaseError } from 'firebase/app';
+import { onAuthStateChanged } from 'firebase/auth';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
+import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
+  nextProgressAfterSuccess,
+  seedVaultDocIfMissing,
+  subscribeVaultProgress,
+  transactionDebugBuyThreeGlimpse,
+  transactionRecordGlimpseFailure,
+  transactionRecordGlimpseSuccess,
+} from '@/src/firebase/vaultProgressFirestore';
+import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
+import {
   DEFAULT_VAULT_PROGRESS,
-  FREE_MISSION_CREDIT_ALLOWANCE,
   getVaultProgress,
   setVaultProgress,
   type VaultProgress,
 } from '@/src/preferences/vaultProgress';
+import { SV } from '@/src/theme/skelevigil';
+
+const REWARD_TITLE = 'Vault Sync Complete!';
+const REWARD_BODY =
+  '10 successful missions have earned you 1 Free Restoration.';
+
+function alertVaultFirestoreError(e: unknown, context: 'save' | 'update') {
+  const title = context === 'save' ? 'Could not save progress' : 'Could not update';
+  if (e instanceof FirebaseError && e.code === 'permission-denied') {
+    Alert.alert(
+      title,
+      'Firestore blocked this request (permission denied). Publish the SkeleVigil Firestore rules that allow users to read and write userVaultProgress/{theirUserId}, or paste the same rules in Firebase Console → Firestore → Rules and click Publish.',
+    );
+    return;
+  }
+  Alert.alert(title, 'Check your connection and try again.');
+}
 
 type VaultProgressContextValue = {
   progress: VaultProgress;
@@ -21,15 +57,62 @@ const VaultProgressContext = createContext<VaultProgressContextValue | null>(nul
 export function VaultProgressProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState<VaultProgress>(DEFAULT_VAULT_PROGRESS);
   const [hydrated, setHydrated] = useState(false);
+  const [firestoreUid, setFirestoreUid] = useState<string | null>(null);
+  const [rewardModalVisible, setRewardModalVisible] = useState(false);
 
   useEffect(() => {
-    void getVaultProgress().then((loaded) => {
-      setProgress(loaded);
-      setHydrated(true);
+    const auth = getFirebaseAuth();
+    let unsubFs: (() => void) | undefined;
+    let cancelled = false;
+
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      if (unsubFs) {
+        unsubFs();
+        unsubFs = undefined;
+      }
+
+      if (!user) {
+        setFirestoreUid(null);
+        void getVaultProgress().then((loaded) => {
+          if (cancelled) return;
+          setProgress(loaded);
+          setHydrated(true);
+        });
+        return;
+      }
+
+      setFirestoreUid(user.uid);
+      setHydrated(false);
+
+      void (async () => {
+        try {
+          const local = await getVaultProgress();
+          if (cancelled) return;
+          await seedVaultDocIfMissing(user.uid, local);
+          if (cancelled) return;
+          unsubFs = subscribeVaultProgress(user.uid, (p) => {
+            if (!cancelled) {
+              setProgress(p);
+              setHydrated(true);
+            }
+          });
+        } catch {
+          if (!cancelled) {
+            setProgress(DEFAULT_VAULT_PROGRESS);
+            setHydrated(true);
+          }
+        }
+      })();
     });
+
+    return () => {
+      cancelled = true;
+      unsubAuth();
+      unsubFs?.();
+    };
   }, []);
 
-  const updateProgress = useCallback((updater: (prev: VaultProgress) => VaultProgress) => {
+  const updateLocalOnly = useCallback((updater: (prev: VaultProgress) => VaultProgress) => {
     setProgress((prev) => {
       const next = updater(prev);
       void setVaultProgress(next);
@@ -38,35 +121,71 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const recordGlimpseSuccess = useCallback(() => {
-    updateProgress((prev) => {
-      const successfulMissions = prev.successfulMissions + 1;
-      return {
-        ...prev,
-        successfulMissions,
-        creditsTowardFreeMission: Math.max(0, FREE_MISSION_CREDIT_ALLOWANCE - successfulMissions),
-      };
+    if (firestoreUid) {
+      void (async () => {
+        try {
+          const { grantedFreeAttempt } = await transactionRecordGlimpseSuccess(firestoreUid);
+          if (grantedFreeAttempt) setRewardModalVisible(true);
+        } catch (err) {
+          alertVaultFirestoreError(err, 'save');
+        }
+      })();
+      return;
+    }
+
+    setProgress((prev) => {
+      const { next, grantedFreeAttempt } = nextProgressAfterSuccess(prev);
+      if (grantedFreeAttempt) {
+        queueMicrotask(() => setRewardModalVisible(true));
+      }
+      void setVaultProgress(next);
+      return next;
     });
-  }, [updateProgress]);
+  }, [firestoreUid]);
 
   const recordGlimpseFailure = useCallback(() => {
-    updateProgress((prev) => ({
+    if (firestoreUid) {
+      void (async () => {
+        try {
+          await transactionRecordGlimpseFailure(firestoreUid);
+        } catch (err) {
+          alertVaultFirestoreError(err, 'save');
+        }
+      })();
+      return;
+    }
+
+    updateLocalOnly((prev) => ({
       ...prev,
       attemptsLeft: {
         ...prev.attemptsLeft,
         glimpse: Math.max(0, prev.attemptsLeft.glimpse - 1),
       },
     }));
-  }, [updateProgress]);
+  }, [firestoreUid, updateLocalOnly]);
 
   const debugBuyThreeVaultCredits = useCallback(() => {
-    updateProgress((prev) => ({
+    if (firestoreUid) {
+      void (async () => {
+        try {
+          await transactionDebugBuyThreeGlimpse(firestoreUid);
+        } catch (err) {
+          alertVaultFirestoreError(err, 'update');
+        }
+      })();
+      return;
+    }
+
+    updateLocalOnly((prev) => ({
       ...prev,
       attemptsLeft: {
         ...prev.attemptsLeft,
         glimpse: prev.attemptsLeft.glimpse + 3,
       },
     }));
-  }, [updateProgress]);
+  }, [firestoreUid, updateLocalOnly]);
+
+  const dismissReward = useCallback(() => setRewardModalVisible(false), []);
 
   const value = useMemo(
     () => ({
@@ -79,7 +198,33 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
     [progress, hydrated, recordGlimpseSuccess, recordGlimpseFailure, debugBuyThreeVaultCredits],
   );
 
-  return <VaultProgressContext.Provider value={value}>{children}</VaultProgressContext.Provider>;
+  return (
+    <VaultProgressContext.Provider value={value}>
+      {children}
+      <Modal
+        visible={rewardModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={dismissReward}>
+        <View style={styles.rewardBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFillObject}
+            onPress={dismissReward}
+            accessibilityLabel="Dismiss vault reward"
+          />
+          <View style={styles.rewardCard}>
+            <Text style={styles.rewardTitle}>{REWARD_TITLE}</Text>
+            <Text style={styles.rewardBody}>{REWARD_BODY}</Text>
+            <Pressable
+              onPress={dismissReward}
+              style={({ pressed }) => [styles.rewardOk, pressed && styles.rewardOkPressed]}>
+              <Text style={styles.rewardOkText}>OK</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    </VaultProgressContext.Provider>
+  );
 }
 
 export function useVaultProgress(): VaultProgressContextValue {
@@ -89,3 +234,52 @@ export function useVaultProgress(): VaultProgressContextValue {
   }
   return ctx;
 }
+
+const styles = StyleSheet.create({
+  rewardBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  rewardCard: {
+    width: '100%',
+    maxWidth: 360,
+    zIndex: 1,
+    backgroundColor: SV.gunmetal,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,255,0.35)',
+    padding: 20,
+  },
+  rewardTitle: {
+    color: SV.neonCyan,
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  rewardBody: {
+    color: SV.surgicalWhite,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  rewardOk: {
+    alignSelf: 'center',
+    backgroundColor: SV.neonCyan,
+    paddingVertical: 12,
+    paddingHorizontal: 36,
+    borderRadius: 8,
+  },
+  rewardOkPressed: {
+    opacity: 0.88,
+  },
+  rewardOkText: {
+    color: SV.black,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+});

@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
 import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
+import { FREE_MISSION_CREDIT_ALLOWANCE } from '@/src/preferences/vaultProgress';
 import { SV } from '@/src/theme/skelevigil';
 
 export default function VaultScreen() {
@@ -51,24 +52,44 @@ export default function VaultScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <View style={styles.body}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Vault Status</Text>
+          <Text style={styles.sectionTitle}>Vault Scoreboard</Text>
           <View style={styles.trackingBox}>
-            <Text style={styles.trackingTitle}>Failure Tracking (Attempts Left)</Text>
-            <Text style={styles.trackingLine}>Glimpse: {progress.attemptsLeft.glimpse}</Text>
-            <Text style={styles.trackingLine}>Stare: {progress.attemptsLeft.stare}</Text>
-            <Text style={styles.trackingLine}>Trance: {progress.attemptsLeft.trance}</Text>
+            <Text style={styles.trackingTitle}>Mission Reserves Available</Text>
+            <Text style={styles.trackingLine}>Glimpse Phase: {progress.attemptsLeft.glimpse}</Text>
+            <Text style={styles.trackingLine}>Stare Phase: {progress.attemptsLeft.stare}</Text>
+            <Text style={styles.trackingLine}>Trance Phase: {progress.attemptsLeft.trance}</Text>
           </View>
-          <View style={[styles.trackingBox, styles.creditsBox]}>
-            <Text style={styles.successValue}>
-              {progress.creditsTowardFreeMission} Credits toward Free Mission
+          <View style={[styles.trackingBox, styles.restorationBox]}>
+            <Text style={styles.restorationLabel}>Progress to Free Restoration</Text>
+            <Text style={styles.restorationCount} accessibilityLabel="Progress to free restoration">
+              {progress.successfulMissions} / {FREE_MISSION_CREDIT_ALLOWANCE}
             </Text>
-            <Text style={styles.trackingLine}>Successful Mission: {progress.successfulMissions}</Text>
+            <View
+              style={styles.progressTrack}
+              accessibilityRole="progressbar"
+              accessibilityValue={{
+                min: 0,
+                max: FREE_MISSION_CREDIT_ALLOWANCE,
+                now: progress.successfulMissions,
+              }}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${Math.min(1, progress.successfulMissions / FREE_MISSION_CREDIT_ALLOWANCE) * 100}%`,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={styles.trackingLine}>
+              Lifetime Missions Secured: {progress.lifetimeMissions}
+            </Text>
           </View>
-          {!hydrated ? <Text style={styles.syncHint}>Syncing local mission data...</Text> : null}
+          {!hydrated ? <Text style={styles.syncHint}>Syncing vault progress...</Text> : null}
         </View>
 
         <View style={[styles.section, styles.purchaseSection]}>
-          <Text style={styles.sectionTitle}>Purchase Area</Text>
+          <Text style={styles.sectionTitle}>Purchase Method</Text>
           <Pressable
             onPress={onBuyVaultCredits}
             style={({ pressed }) => [styles.buyButton, pressed && styles.buyButtonPressed]}
@@ -112,11 +133,34 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textAlign: 'center',
   },
-  successValue: {
+  restorationLabel: {
     color: SV.surgicalWhite,
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '700',
     marginBottom: 8,
+    textAlign: 'center',
+  },
+  restorationCount: {
+    color: SV.surgicalWhite,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  progressTrack: {
+    width: '100%',
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(0,255,255,0.12)',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,255,0.28)',
+    marginBottom: 12,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 4,
+    backgroundColor: SV.neonCyan,
   },
   trackingBox: {
     borderWidth: 1,
@@ -131,13 +175,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     marginBottom: 4,
+    textAlign: 'center',
   },
   trackingLine: {
     color: 'rgba(240,240,240,0.92)',
     fontSize: 14,
     fontWeight: '600',
   },
-  creditsBox: {
+  restorationBox: {
     marginTop: 12,
   },
   syncHint: {

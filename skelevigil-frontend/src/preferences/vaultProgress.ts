@@ -9,6 +9,8 @@ export type VaultAttemptsLeft = {
 export type VaultProgress = {
   creditsTowardFreeMission: number;
   successfulMissions: number;
+  /** Running total of successful missions (never reset by the 10-mission restoration cycle). */
+  lifetimeMissions: number;
   attemptsLeft: VaultAttemptsLeft;
 };
 
@@ -18,6 +20,7 @@ export const FREE_MISSION_CREDIT_ALLOWANCE = 10;
 export const DEFAULT_VAULT_PROGRESS: VaultProgress = {
   creditsTowardFreeMission: FREE_MISSION_CREDIT_ALLOWANCE,
   successfulMissions: 0,
+  lifetimeMissions: 0,
   attemptsLeft: {
     glimpse: 3,
     stare: 2,
@@ -37,10 +40,15 @@ export async function getVaultProgress(): Promise<VaultProgress> {
       typeof parsed.successfulMissions === 'number'
         ? Math.max(0, Math.trunc(parsed.successfulMissions))
         : DEFAULT_VAULT_PROGRESS.successfulMissions;
+    const lifetimeMissions =
+      typeof parsed.lifetimeMissions === 'number'
+        ? Math.max(0, Math.trunc(parsed.lifetimeMissions))
+        : DEFAULT_VAULT_PROGRESS.lifetimeMissions;
     return {
       // Source of truth: allowance (10) minus successful missions.
       creditsTowardFreeMission: Math.max(0, FREE_MISSION_CREDIT_ALLOWANCE - successfulMissions),
       successfulMissions,
+      lifetimeMissions,
       attemptsLeft: {
         glimpse:
           attempts && typeof attempts.glimpse === 'number'
