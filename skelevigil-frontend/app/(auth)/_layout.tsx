@@ -1,14 +1,21 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import type { NavigationProp, ParamListBase } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
 const LOGIN_HELP_TEAL = '#0E9595';
 
-function LoginHelpHeaderBack() {
+function LoginHelpHeaderBack({ navigation }: { navigation: NavigationProp<ParamListBase> }) {
   const router = useRouter();
   return (
     <Pressable
-      onPress={() => router.back()}
+      onPress={() => {
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        } else {
+          router.replace('/(auth)');
+        }
+      }}
       hitSlop={12}
       style={styles.headerBackPressable}
       accessibilityRole="button"
@@ -29,13 +36,13 @@ export default function AuthLayout() {
       }}>
       <Stack.Screen
         name="login-help"
-        options={{
+        options={({ navigation }) => ({
           headerShown: true,
           title: 'Help',
-          headerLeft: () => <LoginHelpHeaderBack />,
+          headerLeft: () => <LoginHelpHeaderBack navigation={navigation} />,
           headerStyle: { backgroundColor: '#0D0D0D' },
           headerTitleStyle: { color: LOGIN_HELP_TEAL, fontWeight: '600', fontSize: 17 },
-        }}
+        })}
       />
     </Stack>
   );

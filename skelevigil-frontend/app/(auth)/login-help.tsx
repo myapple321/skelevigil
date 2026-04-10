@@ -1,22 +1,29 @@
-import { router } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { SvButton } from '@/src/components/auth/SvButton';
 import { SV } from '@/src/theme/skelevigil';
 
+const SUPPORT_EMAIL = 'support@veridiar.com';
+
 export default function LoginHelpScreen() {
+  const openSupportEmail = () => {
+    void Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {
+      Alert.alert('Contact', `Email us at ${SUPPORT_EMAIL}`);
+    });
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Login Help</Text>
+        <Text style={styles.title}>Choose Your Access Method</Text>
 
         <Text style={styles.lead}>
-          You can access your account using any of these three secure methods. For the smoothest
-          experience, always use the same method you chose when you first joined.
+          To begin your mission, select one of the following methods. For the smoothest experience,
+          always use the same method you chose when you first joined to ensure your progress is
+          synchronized.
         </Text>
 
         <View style={styles.block}>
@@ -32,31 +39,47 @@ export default function LoginHelpScreen() {
             <Text style={styles.methodTitle}>Log in with Email: </Text>
             <Text style={styles.body}>The traditional way using a unique password.</Text>
           </Text>
+          <Text style={styles.methodLine}>
+            <Text style={styles.methodTitle}>Log in as Guest: </Text>
+            <Text style={styles.body}>
+              Play immediately without an account. Note: Progress is stored only on this device and
+              cannot be recovered if the app is deleted.
+            </Text>
+          </Text>
         </View>
 
         <Text style={styles.sectionHeading}>Important: One Account per Email</Text>
         <Text style={styles.body}>
-          To keep your personal data secure and organized, our system follows a &quot;One Account
-          per Email&quot; rule.
+          To keep your Mission Reserves and Vault Credits secure, our system follows a &quot;One
+          Account per Email&quot; rule.
         </Text>
         <Text style={[styles.body, styles.paragraphSpaced]}>
           Example: If you originally signed up using &quot;Log in with Google&quot; with your Gmail
-          address, you cannot later use that same Gmail address to &quot;Log in with Email.&quot; You
-          must continue using the Google button to access that specific account.
+          address, you cannot later use that same Gmail address for &quot;Log in with Email.&quot;
+          You must continue using the Google button to access that specific account.
         </Text>
 
-        <Text style={[styles.sectionHeading, styles.subsectionTop]}>Need a New Method?</Text>
+        <Text style={[styles.sectionHeading, styles.subsectionTop]}>
+          Managing Your Guest Account
+        </Text>
         <Text style={styles.body}>
-          If you wish to use the &quot;Log in with Email&quot; option specifically, you must provide
-          an email address that has not already been linked to a Google or Apple login.
+          If you start as a Guest, you can enjoy the full SkeleVigil experience. However, to
+          purchase Vault Credits or ensure your progress is backed up, you will eventually be
+          prompted to &quot;Link&quot; your Guest session to a secure Apple, Google, or Email
+          account.
         </Text>
 
-        <Text style={styles.hintLabel}>Hint:</Text>
-        <Text style={styles.hintBody}>
-          Most users choose the same method they use for their tablet or phone.
+        <Text style={[styles.sectionHeading, styles.subsectionTop]}>Contact Us</Text>
+        <Text style={styles.body}>
+          Please contact the SkeleVigil support team via the email below.
         </Text>
-
-        <SvButton title="OK" onPress={() => router.back()} style={styles.okBtn} />
+        <Pressable
+          onPress={openSupportEmail}
+          accessibilityRole="link"
+          accessibilityLabel={`Email ${SUPPORT_EMAIL}`}
+          style={({ pressed }) => [styles.emailPressable, pressed && styles.emailPressablePressed]}>
+          <Text style={styles.emailLink}>{SUPPORT_EMAIL}</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -119,22 +142,20 @@ const styles = StyleSheet.create({
   paragraphSpaced: {
     marginTop: 12,
   },
-  hintLabel: {
+  emailPressable: {
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+    paddingVertical: 4,
+  },
+  emailPressablePressed: {
+    opacity: 0.75,
+  },
+  emailLink: {
     color: SV.neonCyan,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
-    marginTop: 20,
-    marginBottom: 6,
-  },
-  hintBody: {
-    color: 'rgba(240,240,240,0.88)',
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 20,
-    fontStyle: 'italic',
-    marginBottom: 28,
-  },
-  okBtn: {
-    marginTop: 8,
+    textDecorationLine: 'underline',
+    textAlign: 'center',
   },
 });
