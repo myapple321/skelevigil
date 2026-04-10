@@ -12,6 +12,10 @@ export type VaultProgress = {
   /** Running total of successful missions (never reset by the 10-mission restoration cycle). */
   lifetimeMissions: number;
   attemptsLeft: VaultAttemptsLeft;
+  /**
+   * Monthly gift rotation: 0 = Trance, 1 = Stare, 2 = Glimpse (advances after each claim attempt).
+   */
+  giftRotationIndex: number;
 };
 
 const STORAGE_KEY = '@skelevigil/vault-progress-v1';
@@ -21,6 +25,7 @@ export const DEFAULT_VAULT_PROGRESS: VaultProgress = {
   creditsTowardFreeMission: FREE_MISSION_CREDIT_ALLOWANCE,
   successfulMissions: 0,
   lifetimeMissions: 0,
+  giftRotationIndex: 0,
   attemptsLeft: {
     glimpse: 3,
     stare: 2,
@@ -44,11 +49,17 @@ export async function getVaultProgress(): Promise<VaultProgress> {
       typeof parsed.lifetimeMissions === 'number'
         ? Math.max(0, Math.trunc(parsed.lifetimeMissions))
         : DEFAULT_VAULT_PROGRESS.lifetimeMissions;
+    const griRaw = parsed.giftRotationIndex;
+    const giftRotationIndex =
+      typeof griRaw === 'number' && Number.isFinite(griRaw)
+        ? Math.min(2, Math.max(0, Math.trunc(griRaw) % 3))
+        : DEFAULT_VAULT_PROGRESS.giftRotationIndex;
     return {
       // Source of truth: allowance (10) minus successful missions.
       creditsTowardFreeMission: Math.max(0, FREE_MISSION_CREDIT_ALLOWANCE - successfulMissions),
       successfulMissions,
       lifetimeMissions,
+      giftRotationIndex,
       attemptsLeft: {
         glimpse:
           attempts && typeof attempts.glimpse === 'number'

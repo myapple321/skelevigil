@@ -1,5 +1,6 @@
 import { FirebaseError } from 'firebase/app';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { router } from 'expo-router';
 import {
   createContext,
   useCallback,
@@ -11,17 +12,21 @@ import {
 } from 'react';
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { MonthlyGiftRewardModal } from '@/src/components/vault/MonthlyGiftRewardModal';
 import {
+  applyMonthlyGiftRotationClaim,
+  freeMissionClaimedModalText,
   nextProgressAfterSuccess,
-  pickTierToIncrement,
   seedVaultDocIfMissing,
   subscribeVaultProgress,
   transactionDebugBuyThreeGlimpse,
-  transactionGrantMonthlyGiftFreeAttempt,
+  transactionGrantMonthlyGiftRotation,
   transactionRecordGlimpseFailure,
   transactionRecordGlimpseSuccess,
 } from '@/src/firebase/vaultProgressFirestore';
+import { rescheduleMonthlyGiftFromNow } from '@/src/notifications/missionNotificationsController';
 import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
+import { resolveAuthUserForClaim } from '@/src/firebase/resolveAuthUserForClaim';
 import {
   DEFAULT_VAULT_PROGRESS,
   getVaultProgress,
@@ -52,7 +57,7 @@ type VaultProgressContextValue = {
   recordGlimpseSuccess: () => void;
   recordGlimpseFailure: () => void;
   debugBuyThreeVaultCredits: () => void;
-  claimMonthlyGiftNotificationReward: () => Promise<{ granted: boolean }>;
+  claimMonthlyGiftNotificationReward: () => Promise<void>;
 };
 
 const VaultProgressContext = createContext<VaultProgressContextValue | null>(null);
@@ -62,6 +67,8 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [firestoreUid, setFirestoreUid] = useState<string | null>(null);
   const [rewardModalVisible, setRewardModalVisible] = useState(false);
+  const [monthlyGiftModalVisible, setMonthlyGiftModalVisible] = useState(false);
+  const [monthlyGiftMessage, setMonthlyGiftMessage] = useState('');
 
   useEffect(() => {
     const auth = getFirebaseAuth();
@@ -188,40 +195,65 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
     }));
   }, [firestoreUid, updateLocalOnly]);
 
-  const claimMonthlyGiftNotificationReward = useCallback(async (): Promise<{ granted: boolean }> => {
-    if (firestoreUid) {
+  const claimMonthlyGiftNotificationReward = useCallback(async () => {
+    const authUser = await resolveAuthUserForClaim();
+    if (authUser?.isAnonymous) {
+      Alert.alert(
+        'Secure Account to Claim',
+        'Guest accounts cannot claim monthly gifts. Link Email, Apple, or Google to secure your progress and claim rewards.',
+        [
+          { text: 'Later', style: 'cancel' },
+          {
+            text: 'Go to Login',
+            onPress: () =>
+              void (async () => {
+                try {
+                  await signOut(getFirebaseAuth());
+                  router.replace('/(auth)');
+                } catch {
+                  Alert.alert('Sign out failed', 'Please try again.');
+                }
+              })(),
+          },
+        ],
+      );
+      const p = await getVaultProgress();
+      await rescheduleMonthlyGiftFromNow(p.giftRotationIndex);
+      return;
+    }
+
+    /**
+     * Use Auth uid, not `firestoreUid` state. On cold open from a notification,
+     * `firestoreUid` can still be null while `currentUser` is already restored — the
+     * local-only branch would run, then Firestore snapshot overwrites UI without the +1.
+     */
+    const signedInUid = authUser && !authUser.isAnonymous ? authUser.uid : null;
+    if (signedInUid) {
       try {
-        const granted = await transactionGrantMonthlyGiftFreeAttempt(firestoreUid);
-        if (granted) {
-          Alert.alert('Claimed', 'A free mission attempt was added to your Vault.');
-        } else {
-          Alert.alert('Could not claim', 'Your Vault reserves are full.');
-        }
-        return { granted };
+        const { securedTier, nextGiftRotationIndex, nextProgress } =
+          await transactionGrantMonthlyGiftRotation(signedInUid);
+        setProgress(nextProgress);
+        void setVaultProgress(nextProgress);
+        setMonthlyGiftMessage(freeMissionClaimedModalText(securedTier));
+        setMonthlyGiftModalVisible(true);
+        await rescheduleMonthlyGiftFromNow(nextGiftRotationIndex);
       } catch (err) {
         alertVaultFirestoreError(err, 'update');
-        return { granted: false };
       }
+      return;
     }
 
     const local = await getVaultProgress();
-    const tier = pickTierToIncrement(local.attemptsLeft);
-    if (!tier) {
-      Alert.alert('Could not claim', 'Your Vault reserves are full.');
-      return { granted: false };
-    }
-    const attemptsLeft = {
-      ...local.attemptsLeft,
-      [tier]: local.attemptsLeft[tier] + 1,
-    };
-    const next: VaultProgress = { ...local, attemptsLeft };
+    const { next, securedTier } = applyMonthlyGiftRotationClaim(local);
     await setVaultProgress(next);
     setProgress(next);
-    Alert.alert('Claimed', 'A free mission attempt was added to your Vault.');
-    return { granted: true };
-  }, [firestoreUid]);
+    setMonthlyGiftMessage(freeMissionClaimedModalText(securedTier));
+    setMonthlyGiftModalVisible(true);
+    await rescheduleMonthlyGiftFromNow(next.giftRotationIndex);
+  }, []);
 
   const dismissReward = useCallback(() => setRewardModalVisible(false), []);
+  const dismissMonthlyGift = useCallback(() => setMonthlyGiftModalVisible(false), []);
 
   const value = useMemo(
     () => ({
@@ -267,6 +299,11 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
           </View>
         </View>
       </Modal>
+      <MonthlyGiftRewardModal
+        visible={monthlyGiftModalVisible}
+        message={monthlyGiftMessage}
+        onDismiss={dismissMonthlyGift}
+      />
     </VaultProgressContext.Provider>
   );
 }

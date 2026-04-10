@@ -7,9 +7,9 @@ import { useMissionAlert } from '@/src/contexts/MissionAlertContext';
 import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
 import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
 import {
-  KIND_MONTHLY_GIFT,
+  KIND_REENGAGEMENT,
+  isMonthlyGiftNotificationResponse,
   parseNotificationKind,
-  rescheduleMonthlyGiftFromNow,
   syncMissionNotifications,
 } from '@/src/notifications/missionNotificationsController';
 
@@ -18,14 +18,18 @@ import {
  */
 export function MissionNotificationsBinder() {
   const { missionAlertsEnabled, hydrated: missionHydrated } = useMissionAlert();
-  const { claimMonthlyGiftNotificationReward } = useVaultProgress();
+  const { claimMonthlyGiftNotificationReward, progress } = useVaultProgress();
   const lastMonthlyKey = useRef<string | null>(null);
 
   const processResponse = useCallback(
     async (response: Notifications.NotificationResponse) => {
       const data = response.notification.request.content.data as Record<string, unknown> | undefined;
       const kind = parseNotificationKind(data);
-      if (kind !== KIND_MONTHLY_GIFT) {
+      if (kind === KIND_REENGAGEMENT) {
+        void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
+        return;
+      }
+      if (!isMonthlyGiftNotificationResponse(response)) {
         void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
         return;
       }
@@ -37,7 +41,6 @@ export function MissionNotificationsBinder() {
       lastMonthlyKey.current = key;
 
       await claimMonthlyGiftNotificationReward();
-      await rescheduleMonthlyGiftFromNow();
       void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
     },
     [claimMonthlyGiftNotificationReward],
@@ -77,6 +80,7 @@ export function MissionNotificationsBinder() {
       void syncMissionNotifications({
         missionAlertsEnabled,
         signedIn: getFirebaseAuth().currentUser != null,
+        giftRotationIndex: progress.giftRotationIndex,
       });
     };
 
@@ -94,7 +98,7 @@ export function MissionNotificationsBinder() {
       sub.remove();
       unsubAuth();
     };
-  }, [missionAlertsEnabled, missionHydrated]);
+  }, [missionAlertsEnabled, missionHydrated, progress.giftRotationIndex]);
 
   return null;
 }

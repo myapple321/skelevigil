@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import type { NotificationResponse } from 'expo-notifications';
 import type { DateTriggerInput, TimeIntervalTriggerInput } from 'expo-notifications';
 import { Platform } from 'react-native';
 
@@ -18,8 +19,21 @@ export const KIND_MONTHLY_GIFT = 'monthly_gift';
 
 export const COPY_REENGAGEMENT_BODY =
   'The neural block is waiting to be excavated. Return to the Vigil to continue your progress.';
-export const COPY_MONTHLY_BODY =
-  'A Free Mission has been authorized. Tap here to claim your access and secure the Immutable Strand.';
+
+/** Body for the next monthly gift, matching `giftRotationIndex` (0 Trance, 1 Stare, 2 Glimpse). */
+export function monthlyGiftNotificationBodyForRotationIndex(rotationIndex: number): string {
+  const i = Math.min(2, Math.max(0, Math.trunc(rotationIndex) % 3));
+  switch (i) {
+    case 0:
+      return 'Access Authorized: A free Trance mission has been added to your Vault. Secure the dual-planes now.';
+    case 1:
+      return 'Vault Sync: You have earned one free Stare restoration. The diamonds await.';
+    case 2:
+      return 'Mission Gift: Your Glimpse reserves have been replenished. Tap here to start.';
+    default:
+      return 'Mission Gift: Your Glimpse reserves have been replenished. Tap here to start.';
+  }
+}
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const REENGAGEMENT_SECONDS = 4 * 24 * 60 * 60;
@@ -31,6 +45,12 @@ export function randomOffsetMsWithin30Days(): number {
 }
 
 let androidChannelReady = false;
+
+/**
+ * DEBUG-only: cycles 0→1→2 on each Monthly Gift test tap so all three notification bodies
+ * can be previewed without claiming (vault `giftRotationIndex` only moves on real claim).
+ */
+let debugMonthlyGiftPreviewIndex = 0;
 
 export async function ensureMissionAndroidChannel(): Promise<void> {
   if (Platform.OS !== 'android' || androidChannelReady) return;
@@ -79,15 +99,15 @@ async function scheduleReengagementNotification(): Promise<void> {
   });
 }
 
-async function scheduleMonthlyGiftAt(date: Date): Promise<void> {
+async function scheduleMonthlyGiftAt(date: Date, giftRotationIndex: number): Promise<void> {
   await ensureMissionAndroidChannel();
   await Notifications.cancelScheduledNotificationAsync(NOTIF_ID_MONTHLY_GIFT).catch(() => undefined);
   await Notifications.scheduleNotificationAsync({
     identifier: NOTIF_ID_MONTHLY_GIFT,
     content: {
       title: 'SkeleVigil',
-      body: COPY_MONTHLY_BODY,
-      data: { [DATA_KIND]: KIND_MONTHLY_GIFT },
+      body: monthlyGiftNotificationBodyForRotationIndex(giftRotationIndex),
+      data: { [DATA_KIND]: KIND_MONTHLY_GIFT, giftRotationIndex },
       sound: 'default',
     },
     trigger: missionChannelTrigger({
@@ -99,23 +119,23 @@ async function scheduleMonthlyGiftAt(date: Date): Promise<void> {
 
 /**
  * Rolls the stored monthly fire time forward until it is in the future, then schedules.
- * Call only when signed in (monthly gift mutates server-side vault on tap).
+ * `giftRotationIndex` selects which phase copy is shown (next claim target).
  */
-export async function syncMonthlyGiftSchedule(): Promise<void> {
+export async function syncMonthlyGiftSchedule(giftRotationIndex: number): Promise<void> {
   let nextAt = await getMonthlyGiftNextFireAtMs();
   const now = Date.now();
   if (nextAt === null || nextAt <= now) {
     nextAt = now + randomOffsetMsWithin30Days();
     await setMonthlyGiftNextFireAtMs(nextAt);
   }
-  await scheduleMonthlyGiftAt(new Date(nextAt));
+  await scheduleMonthlyGiftAt(new Date(nextAt), giftRotationIndex);
 }
 
 /** After a successful claim or when initializing monthly for a signed-in user. */
-export async function rescheduleMonthlyGiftFromNow(): Promise<void> {
+export async function rescheduleMonthlyGiftFromNow(nextGiftRotationIndex: number): Promise<void> {
   const nextAt = Date.now() + randomOffsetMsWithin30Days();
   await setMonthlyGiftNextFireAtMs(nextAt);
-  await scheduleMonthlyGiftAt(new Date(nextAt));
+  await scheduleMonthlyGiftAt(new Date(nextAt), nextGiftRotationIndex);
 }
 
 export async function clearMonthlyGiftScheduleStorage(): Promise<void> {
@@ -124,10 +144,13 @@ export async function clearMonthlyGiftScheduleStorage(): Promise<void> {
 
 /**
  * Re-engagement: always 4 days from now (idle). Monthly: next randomized slot, signed-in only.
+ * Pass current `giftRotationIndex` (0–2) so notification body matches the next grant.
  */
 export async function syncMissionNotifications(opts: {
   missionAlertsEnabled: boolean;
   signedIn: boolean;
+  /** Used for monthly notification copy; default 0 if omitted. */
+  giftRotationIndex?: number;
 }): Promise<void> {
   if (!opts.missionAlertsEnabled) {
     await cancelMissionScheduledNotifications();
@@ -137,7 +160,11 @@ export async function syncMissionNotifications(opts: {
   await scheduleReengagementNotification();
 
   if (opts.signedIn) {
-    await syncMonthlyGiftSchedule();
+    const gri =
+      typeof opts.giftRotationIndex === 'number' && Number.isFinite(opts.giftRotationIndex)
+        ? Math.min(2, Math.max(0, Math.trunc(opts.giftRotationIndex) % 3))
+        : 0;
+    await syncMonthlyGiftSchedule(gri);
   } else {
     await Notifications.cancelScheduledNotificationAsync(NOTIF_ID_MONTHLY_GIFT).catch(() => undefined);
   }
@@ -148,7 +175,28 @@ export function parseNotificationKind(
 ): string | null {
   if (!data || typeof data !== 'object') return null;
   const raw = data[DATA_KIND];
-  return typeof raw === 'string' ? raw : null;
+  if (typeof raw === 'string') return raw;
+  if (raw != null && typeof raw !== 'object') return String(raw);
+  return null;
+}
+
+function monthlyGiftBodyMatches(body: string | null | undefined): boolean {
+  if (!body) return false;
+  return (
+    body.includes('dual-planes') ||
+    body.includes('diamonds await') ||
+    body.includes('Glimpse reserves have been replenished')
+  );
+}
+
+/**
+ * Monthly gift tap handling: `data.svKind` is sometimes missing on iOS; use request identifier + body.
+ */
+export function isMonthlyGiftNotificationResponse(response: NotificationResponse): boolean {
+  const data = response.notification.request.content.data as Record<string, unknown> | undefined;
+  if (parseNotificationKind(data) === KIND_MONTHLY_GIFT) return true;
+  if (response.notification.request.identifier === NOTIF_ID_MONTHLY_GIFT) return true;
+  return monthlyGiftBodyMatches(response.notification.request.content.body);
 }
 
 /** DEBUG: fires after a short delay with production copy + data. */
@@ -169,13 +217,19 @@ export async function debugScheduleReengagementInSeconds(seconds = 3): Promise<v
   });
 }
 
+/**
+ * Schedules a test monthly notification. Each call uses the next preview slot (Trance → Stare → Glimpse)
+ * so repeated DEBUG taps show all three copies. Tapping the notification still applies the real vault rotation.
+ */
 export async function debugScheduleMonthlyGiftInSeconds(seconds = 3): Promise<void> {
   await ensureMissionAndroidChannel();
+  const gri = debugMonthlyGiftPreviewIndex % 3;
+  debugMonthlyGiftPreviewIndex = (debugMonthlyGiftPreviewIndex + 1) % 3;
   await Notifications.scheduleNotificationAsync({
     content: {
       title: 'SkeleVigil',
-      body: COPY_MONTHLY_BODY,
-      data: { [DATA_KIND]: KIND_MONTHLY_GIFT, debug: true },
+      body: monthlyGiftNotificationBodyForRotationIndex(gri),
+      data: { [DATA_KIND]: KIND_MONTHLY_GIFT, giftRotationIndex: gri, debug: true },
       sound: 'default',
     },
     trigger: missionChannelTrigger({

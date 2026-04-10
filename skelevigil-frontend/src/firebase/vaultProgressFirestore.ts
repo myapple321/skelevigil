@@ -62,10 +62,16 @@ function progressFromDoc(data: Record<string, unknown> | undefined): VaultProgre
   const lmRaw = data.lifetimeMissions;
   const lifetimeMissions =
     typeof lmRaw === 'number' ? Math.max(0, Math.trunc(lmRaw)) : DEFAULT_VAULT_PROGRESS.lifetimeMissions;
+  const griRaw = data.giftRotationIndex;
+  const giftRotationIndex =
+    typeof griRaw === 'number' && Number.isFinite(griRaw)
+      ? Math.min(2, Math.max(0, Math.trunc(griRaw) % 3))
+      : DEFAULT_VAULT_PROGRESS.giftRotationIndex;
 
   return {
     successfulMissions,
     lifetimeMissions,
+    giftRotationIndex,
     creditsTowardFreeMission: Math.max(0, FREE_MISSION_CREDIT_ALLOWANCE - successfulMissions),
     attemptsLeft,
   };
@@ -75,12 +81,45 @@ function toFirestorePayload(p: VaultProgress): Record<string, unknown> {
   return {
     successfulMissions: p.successfulMissions,
     lifetimeMissions: p.lifetimeMissions,
+    giftRotationIndex: p.giftRotationIndex,
     attemptsLeft: {
       glimpse: p.attemptsLeft.glimpse,
       stare: p.attemptsLeft.stare,
       trance: p.attemptsLeft.trance,
     },
     updatedAt: serverTimestamp(),
+  };
+}
+
+/** Monthly gift: Trance → Stare → Glimpse by index, then wrap. */
+export const GIFT_ROTATION_ORDER: (keyof VaultAttemptsLeft)[] = ['trance', 'stare', 'glimpse'];
+
+/** Post-claim confirmation (modal), per product copy. */
+export function freeMissionClaimedModalText(tier: keyof VaultAttemptsLeft): string {
+  const name = tier === 'trance' ? 'Trance' : tier === 'stare' ? 'Stare' : 'Glimpse';
+  return `Free Mission Claimed! Your ${name} reserves have been increased by 1.`;
+}
+
+/**
+ * Pure rotational monthly gift: always +1 on the current phase index, then advance 0→1→2→0.
+ * No reserve caps (monthly gift is additive regardless of current balance).
+ */
+export function applyMonthlyGiftRotationClaim(prev: VaultProgress): {
+  next: VaultProgress;
+  securedTier: keyof VaultAttemptsLeft;
+} {
+  const idx = Math.min(2, Math.max(0, Math.trunc(prev.giftRotationIndex) % 3));
+  const tier = GIFT_ROTATION_ORDER[idx];
+  const attemptsLeft = { ...prev.attemptsLeft };
+  attemptsLeft[tier] += 1;
+  const nextIndex = (idx + 1) % 3;
+  return {
+    next: {
+      ...prev,
+      attemptsLeft,
+      giftRotationIndex: nextIndex,
+    },
+    securedTier: tier,
   };
 }
 
@@ -202,22 +241,24 @@ export async function transactionDebugBuyThreeGlimpse(uid: string): Promise<void
   });
 }
 
-/** +1 attempt on the same tier priority as other free-mission grants (Trance → Stare → Glimpse). */
-export async function transactionGrantMonthlyGiftFreeAttempt(uid: string): Promise<boolean> {
+/** Monthly gift: pure rotational +1; persists giftRotationIndex. */
+export async function transactionGrantMonthlyGiftRotation(uid: string): Promise<{
+  securedTier: keyof VaultAttemptsLeft;
+  nextGiftRotationIndex: number;
+  nextProgress: VaultProgress;
+}> {
   const ref = vaultDocRef(uid);
   return runTransaction(getFirebaseFirestore(), async (tx) => {
     const snap = await tx.get(ref);
     const prev = snap.exists()
       ? progressFromDoc(snap.data() as Record<string, unknown>)
       : DEFAULT_VAULT_PROGRESS;
-    const tier = pickTierToIncrement(prev.attemptsLeft);
-    if (!tier) return false;
-    const attemptsLeft = {
-      ...prev.attemptsLeft,
-      [tier]: prev.attemptsLeft[tier] + 1,
-    };
-    const next: VaultProgress = { ...prev, attemptsLeft };
+    const { next, securedTier } = applyMonthlyGiftRotationClaim(prev);
     tx.set(ref, toFirestorePayload(next), { merge: true });
-    return true;
+    return {
+      securedTier,
+      nextGiftRotationIndex: next.giftRotationIndex,
+      nextProgress: next,
+    };
   });
 }
