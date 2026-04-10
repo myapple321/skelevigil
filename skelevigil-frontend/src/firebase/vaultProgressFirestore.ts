@@ -108,7 +108,10 @@ export function applyMonthlyGiftRotationClaim(prev: VaultProgress): {
   next: VaultProgress;
   securedTier: keyof VaultAttemptsLeft;
 } {
-  const idx = Math.min(2, Math.max(0, Math.trunc(prev.giftRotationIndex) % 3));
+  const rawGri = prev.giftRotationIndex;
+  const normalizedGri =
+    typeof rawGri === 'number' && Number.isFinite(rawGri) ? Math.trunc(rawGri) : 0;
+  const idx = Math.min(2, Math.max(0, normalizedGri % 3));
   const tier = GIFT_ROTATION_ORDER[idx];
   const attemptsLeft = { ...prev.attemptsLeft };
   attemptsLeft[tier] += 1;

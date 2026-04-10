@@ -18,8 +18,10 @@ import {
  */
 export function MissionNotificationsBinder() {
   const { missionAlertsEnabled, hydrated: missionHydrated } = useMissionAlert();
-  const { claimMonthlyGiftNotificationReward, progress } = useVaultProgress();
+  const { claimMonthlyGiftNotificationReward, progress, hydrated: vaultHydrated } = useVaultProgress();
   const lastMonthlyKey = useRef<string | null>(null);
+  const progressRef = useRef(progress);
+  progressRef.current = progress;
 
   const processResponse = useCallback(
     async (response: Notifications.NotificationResponse) => {
@@ -73,32 +75,40 @@ export function MissionNotificationsBinder() {
     });
   }, []);
 
+  /** Re-engagement + monthly body keyed to Firestore `giftRotationIndex` (never use stale index from foreground). */
   useEffect(() => {
-    if (!missionHydrated) return;
+    if (!missionHydrated || !vaultHydrated) return;
 
-    const run = () => {
+    const runFull = () => {
       void syncMissionNotifications({
         missionAlertsEnabled,
         signedIn: getFirebaseAuth().currentUser != null,
-        giftRotationIndex: progress.giftRotationIndex,
+        giftRotationIndex: progressRef.current.giftRotationIndex,
+        reengagementOnly: false,
       });
     };
 
-    run();
-
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') run();
-    });
-
+    runFull();
     const unsubAuth = onAuthStateChanged(getFirebaseAuth(), () => {
-      run();
+      runFull();
     });
+    return () => unsubAuth();
+  }, [missionAlertsEnabled, missionHydrated, vaultHydrated, progress.giftRotationIndex]);
 
-    return () => {
-      sub.remove();
-      unsubAuth();
-    };
-  }, [missionAlertsEnabled, missionHydrated, progress.giftRotationIndex]);
+  /** Foreground: only reset the 4-day idle notification; do not reschedule monthly (avoids wiping post-claim rotation). */
+  useEffect(() => {
+    if (!missionHydrated) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void syncMissionNotifications({
+          missionAlertsEnabled,
+          signedIn: getFirebaseAuth().currentUser != null,
+          reengagementOnly: true,
+        });
+      }
+    });
+    return () => sub.remove();
+  }, [missionAlertsEnabled, missionHydrated]);
 
   return null;
 }

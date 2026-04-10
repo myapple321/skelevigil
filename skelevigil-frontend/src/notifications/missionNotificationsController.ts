@@ -145,12 +145,17 @@ export async function clearMonthlyGiftScheduleStorage(): Promise<void> {
 /**
  * Re-engagement: always 4 days from now (idle). Monthly: next randomized slot, signed-in only.
  * Pass current `giftRotationIndex` (0–2) so notification body matches the next grant.
+ *
+ * `reengagementOnly`: refresh the 4-day idle timer without rescheduling the monthly gift.
+ * Use on AppState "active" so a stale React `giftRotationIndex` cannot overwrite the monthly
+ * notification right after a claim (would keep showing Trance forever).
  */
 export async function syncMissionNotifications(opts: {
   missionAlertsEnabled: boolean;
   signedIn: boolean;
   /** Used for monthly notification copy; default 0 if omitted. */
   giftRotationIndex?: number;
+  reengagementOnly?: boolean;
 }): Promise<void> {
   if (!opts.missionAlertsEnabled) {
     await cancelMissionScheduledNotifications();
@@ -158,6 +163,13 @@ export async function syncMissionNotifications(opts: {
   }
 
   await scheduleReengagementNotification();
+
+  if (opts.reengagementOnly) {
+    if (!opts.signedIn) {
+      await Notifications.cancelScheduledNotificationAsync(NOTIF_ID_MONTHLY_GIFT).catch(() => undefined);
+    }
+    return;
+  }
 
   if (opts.signedIn) {
     const gri =
