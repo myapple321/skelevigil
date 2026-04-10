@@ -4,9 +4,12 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import 'react-native-reanimated';
 
 import { AuthGate } from '@/src/components/auth/AuthGate';
+import { MissionNotificationsBinder } from '@/src/components/notifications/MissionNotificationsBinder';
+import { MissionAlertProvider } from '@/src/contexts/MissionAlertContext';
 import { SfxPreferenceProvider } from '@/src/contexts/SfxPreferenceContext';
 import { VaultProgressProvider } from '@/src/contexts/VaultProgressContext';
 
@@ -55,15 +58,18 @@ export default function RootLayout() {
     <ThemeProvider value={navigationTheme}>
       <StatusBar style="light" />
       <SfxPreferenceProvider>
-        <VaultProgressProvider>
-          <AuthGate>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="(main)" />
-              <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: true }} />
-            </Stack>
-          </AuthGate>
-        </VaultProgressProvider>
+        <MissionAlertProvider>
+          <VaultProgressProvider>
+            {Platform.OS !== 'web' ? <MissionNotificationsBinder /> : null}
+            <AuthGate>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(auth)" />
+                <Stack.Screen name="(main)" />
+                <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: true }} />
+              </Stack>
+            </AuthGate>
+          </VaultProgressProvider>
+        </MissionAlertProvider>
       </SfxPreferenceProvider>
     </ThemeProvider>
   );

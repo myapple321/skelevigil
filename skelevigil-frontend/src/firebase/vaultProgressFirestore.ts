@@ -201,3 +201,23 @@ export async function transactionDebugBuyThreeGlimpse(uid: string): Promise<void
     tx.set(ref, toFirestorePayload(next), { merge: true });
   });
 }
+
+/** +1 attempt on the same tier priority as other free-mission grants (Trance → Stare → Glimpse). */
+export async function transactionGrantMonthlyGiftFreeAttempt(uid: string): Promise<boolean> {
+  const ref = vaultDocRef(uid);
+  return runTransaction(getFirebaseFirestore(), async (tx) => {
+    const snap = await tx.get(ref);
+    const prev = snap.exists()
+      ? progressFromDoc(snap.data() as Record<string, unknown>)
+      : DEFAULT_VAULT_PROGRESS;
+    const tier = pickTierToIncrement(prev.attemptsLeft);
+    if (!tier) return false;
+    const attemptsLeft = {
+      ...prev.attemptsLeft,
+      [tier]: prev.attemptsLeft[tier] + 1,
+    };
+    const next: VaultProgress = { ...prev, attemptsLeft };
+    tx.set(ref, toFirestorePayload(next), { merge: true });
+    return true;
+  });
+}

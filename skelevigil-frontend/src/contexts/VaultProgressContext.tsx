@@ -13,9 +13,11 @@ import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   nextProgressAfterSuccess,
+  pickTierToIncrement,
   seedVaultDocIfMissing,
   subscribeVaultProgress,
   transactionDebugBuyThreeGlimpse,
+  transactionGrantMonthlyGiftFreeAttempt,
   transactionRecordGlimpseFailure,
   transactionRecordGlimpseSuccess,
 } from '@/src/firebase/vaultProgressFirestore';
@@ -50,6 +52,7 @@ type VaultProgressContextValue = {
   recordGlimpseSuccess: () => void;
   recordGlimpseFailure: () => void;
   debugBuyThreeVaultCredits: () => void;
+  claimMonthlyGiftNotificationReward: () => Promise<{ granted: boolean }>;
 };
 
 const VaultProgressContext = createContext<VaultProgressContextValue | null>(null);
@@ -185,6 +188,39 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
     }));
   }, [firestoreUid, updateLocalOnly]);
 
+  const claimMonthlyGiftNotificationReward = useCallback(async (): Promise<{ granted: boolean }> => {
+    if (firestoreUid) {
+      try {
+        const granted = await transactionGrantMonthlyGiftFreeAttempt(firestoreUid);
+        if (granted) {
+          Alert.alert('Claimed', 'A free mission attempt was added to your Vault.');
+        } else {
+          Alert.alert('Could not claim', 'Your Vault reserves are full.');
+        }
+        return { granted };
+      } catch (err) {
+        alertVaultFirestoreError(err, 'update');
+        return { granted: false };
+      }
+    }
+
+    const local = await getVaultProgress();
+    const tier = pickTierToIncrement(local.attemptsLeft);
+    if (!tier) {
+      Alert.alert('Could not claim', 'Your Vault reserves are full.');
+      return { granted: false };
+    }
+    const attemptsLeft = {
+      ...local.attemptsLeft,
+      [tier]: local.attemptsLeft[tier] + 1,
+    };
+    const next: VaultProgress = { ...local, attemptsLeft };
+    await setVaultProgress(next);
+    setProgress(next);
+    Alert.alert('Claimed', 'A free mission attempt was added to your Vault.');
+    return { granted: true };
+  }, [firestoreUid]);
+
   const dismissReward = useCallback(() => setRewardModalVisible(false), []);
 
   const value = useMemo(
@@ -194,8 +230,16 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
       recordGlimpseSuccess,
       recordGlimpseFailure,
       debugBuyThreeVaultCredits,
+      claimMonthlyGiftNotificationReward,
     }),
-    [progress, hydrated, recordGlimpseSuccess, recordGlimpseFailure, debugBuyThreeVaultCredits],
+    [
+      progress,
+      hydrated,
+      recordGlimpseSuccess,
+      recordGlimpseFailure,
+      debugBuyThreeVaultCredits,
+      claimMonthlyGiftNotificationReward,
+    ],
   );
 
   return (

@@ -22,7 +22,18 @@
         "backgroundColor": "#141416",
         "foregroundImage": "./assets/icon_master.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ],
+      "package": "com.anonymous.skelevigilfrontend"
     },
     "web": {
       "bundler": "metro",
@@ -32,7 +43,23 @@
     "plugins": [
       "expo-router",
       "expo-apple-authentication",
-      "expo-audio"
+      "expo-audio",
+      [
+        "react-native-permissions",
+        {
+          "iosPermissions": [
+            "Notifications"
+          ]
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon_master.png",
+          "color": "#141416",
+          "sounds": []
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

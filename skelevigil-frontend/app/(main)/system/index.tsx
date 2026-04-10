@@ -7,6 +7,7 @@ import type { ComponentProps } from 'react';
 import { useMemo, useState } from 'react';
 import {
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,8 +17,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useMissionAlert } from '@/src/contexts/MissionAlertContext';
 import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
 import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
+import {
+  debugScheduleMonthlyGiftInSeconds,
+  debugScheduleReengagementInSeconds,
+} from '@/src/notifications/missionNotificationsController';
 import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
 import { mapAuthErrorMessage } from '@/src/firebase/mapAuthError';
 import { SV } from '@/src/theme/skelevigil';
@@ -58,6 +64,35 @@ function deleteModalAccountSummary(user: User): { emailDisplay: string; methodsL
 }
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
+
+function MissionAlertsRow() {
+  const { missionAlertsEnabled, setMissionAlertsEnabled, hydrated } = useMissionAlert();
+  return (
+    <View style={styles.toggleRow}>
+      <View style={styles.rowMain}>
+        <Ionicons name="notifications-outline" size={24} color={SV.neonCyan} style={styles.rowIcon} />
+        <View style={styles.toggleTextBlock}>
+          <Text style={styles.missionToggleTitle}>Mission Alerts</Text>
+          <Text style={styles.missionToggleSub}>
+            Enable to receive mission briefings, recovery reminders, and monthly free mission rewards.
+          </Text>
+        </View>
+      </View>
+      <View style={styles.missionSwitchWrap} accessibilityRole="none">
+        <Switch
+          accessibilityLabel="Mission Alerts"
+          value={missionAlertsEnabled}
+          disabled={!hydrated}
+          onValueChange={(v) => void setMissionAlertsEnabled(v)}
+          trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(0,255,255,0.35)' }}
+          thumbColor={missionAlertsEnabled ? SV.surgicalWhite : 'rgba(200,200,200,0.95)'}
+          ios_backgroundColor="rgba(255,255,255,0.12)"
+          style={styles.missionSwitch}
+        />
+      </View>
+    </View>
+  );
+}
 
 function SoundEffectsRow() {
   const { sfxEnabled, setSfxEnabled, hydrated } = useSfxPreference();
@@ -110,6 +145,9 @@ export default function SystemIndexScreen() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteNeedsRecentSignIn, setDeleteNeedsRecentSignIn] = useState(false);
   const { debugBuyThreeVaultCredits } = useVaultProgress();
+  const { missionAlertsEnabled, hydrated: missionAlertsHydrated } = useMissionAlert();
+
+  const debugMissionAlertsReady = missionAlertsHydrated && missionAlertsEnabled;
 
   const closeDeleteModal = () => {
     if (deleteBusy) return;
@@ -256,6 +294,12 @@ export default function SystemIndexScreen() {
         <Text style={styles.sectionTitle}>Preferences</Text>
         <View style={styles.card}>
           <SoundEffectsRow />
+          {Platform.OS !== 'web' ? (
+            <>
+              <View style={styles.divider} />
+              <MissionAlertsRow />
+            </>
+          ) : null}
         </View>
 
         <Text style={styles.sectionTitle}>Support</Text>
@@ -293,8 +337,56 @@ export default function SystemIndexScreen() {
           <Pressable
             onPress={debugBuyThreeVaultCredits}
             style={({ pressed }) => [styles.debugBuyBtn, pressed && styles.debugBuyPressed]}>
-            <Text style={styles.debugBuyText}>Buy 3 Vault Credits - $0.99</Text>
+            <Text style={styles.debugBuyText}>DEBUG [Buy 3 Vault Credits - $0.99]</Text>
           </Pressable>
+          {Platform.OS !== 'web' ? (
+            <>
+              <Pressable
+                accessibilityHint={
+                  debugMissionAlertsReady
+                    ? undefined
+                    : 'Turn on Mission Alerts in Preferences first.'
+                }
+                accessibilityState={{ disabled: !debugMissionAlertsReady }}
+                onPress={() => void debugScheduleReengagementInSeconds(3)}
+                disabled={!debugMissionAlertsReady}
+                style={({ pressed }) => [
+                  styles.debugBuyBtn,
+                  pressed && debugMissionAlertsReady && styles.debugBuyPressed,
+                  !debugMissionAlertsReady && styles.debugBuyBtnDisabled,
+                ]}>
+                <Text
+                  style={[
+                    styles.debugBuyText,
+                    !debugMissionAlertsReady && styles.debugBuyTextDisabled,
+                  ]}>
+                  DEBUG [Re-Engagement Notify]
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityHint={
+                  debugMissionAlertsReady
+                    ? undefined
+                    : 'Turn on Mission Alerts in Preferences first.'
+                }
+                accessibilityState={{ disabled: !debugMissionAlertsReady }}
+                onPress={() => void debugScheduleMonthlyGiftInSeconds(3)}
+                disabled={!debugMissionAlertsReady}
+                style={({ pressed }) => [
+                  styles.debugBuyBtn,
+                  pressed && debugMissionAlertsReady && styles.debugBuyPressed,
+                  !debugMissionAlertsReady && styles.debugBuyBtnDisabled,
+                ]}>
+                <Text
+                  style={[
+                    styles.debugBuyText,
+                    !debugMissionAlertsReady && styles.debugBuyTextDisabled,
+                  ]}>
+                  DEBUG [Monthly Gift Notify]
+                </Text>
+              </Pressable>
+            </>
+          ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -377,6 +469,25 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: '500',
   },
+  missionToggleTitle: {
+    color: SV.surgicalWhite,
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  missionToggleSub: {
+    color: SV.muted,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+  missionSwitchWrap: {
+    transform: [{ scaleX: 1.28 }, { scaleY: 1.22 }],
+    marginRight: -2,
+  },
+  missionSwitch: {
+    minWidth: 52,
+  },
   divider: {
     height: 1,
     backgroundColor: 'rgba(0,255,255,0.12)',
@@ -451,6 +562,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  debugBuyBtnDisabled: {
+    opacity: 0.45,
+    borderColor: 'rgba(0,255,255,0.25)',
+  },
+  debugBuyTextDisabled: {
+    color: SV.muted,
   },
   modalBackdrop: {
     flex: 1,
