@@ -81,6 +81,11 @@ export default function VigilScreen() {
   const [missionSuccessModalVisible, setMissionSuccessModalVisible] = useState(false);
   /** After a won round: stay on solved grid until the user taps New Mission (no auto-shuffle on Continue). */
   const [awaitingNewMissionAfterSuccess, setAwaitingNewMissionAfterSuccess] = useState(false);
+  /**
+   * True after New Mission starts a round until success/failure ends it — allows playing at 0 reserves
+   * until the round finishes (last credit was already spent on this sortie).
+   */
+  const [hasActiveRound, setHasActiveRound] = useState(false);
   const [infoModal, setInfoModal] = useState<{ title: string; body: string } | null>(null);
 
   const missionSuccessOpenRef = useRef(missionSuccessModalVisible);
@@ -110,7 +115,7 @@ export default function VigilScreen() {
   timedOutRef.current = timedOut;
 
   const glimpseReserves = progress.attemptsLeft[VIGIL_VAULT_PHASE];
-  const glimpseLocked = glimpseReserves <= 0;
+  const glimpseLocked = glimpseReserves <= 0 && !hasActiveRound;
 
   const neuralTileSetForUi = useMemo(
     () => new Set(neuralBlocks.map(neuralBlockToTileIndex)),
@@ -202,12 +207,14 @@ export default function VigilScreen() {
     if (outcomeCommittedRef.current) return;
     outcomeCommittedRef.current = true;
     paidForCurrentRoundRef.current = false;
+    setHasActiveRound(false);
     recordGlimpseSuccess();
   };
 
   const commitMissionFailure = () => {
     if (outcomeCommittedRef.current) return;
     outcomeCommittedRef.current = true;
+    setHasActiveRound(false);
     lastRoundConsumedReserveRef.current = true;
     if (paidForCurrentRoundRef.current) {
       paidForCurrentRoundRef.current = false;
@@ -285,11 +292,14 @@ export default function VigilScreen() {
   }, [timedOut]);
 
   const onNewMission = () => {
-    if (glimpseReserves <= 0) {
+    const skipDebit = lastRoundConsumedReserveRef.current;
+    if (glimpseReserves <= 0 && !skipDebit) {
       setReservesEmptyModalVisible(true);
       return;
     }
-    const skipDebit = lastRoundConsumedReserveRef.current;
+    // Before deduct: local `deductGlimpseAttempt` updates reserves synchronously; without this,
+    // one render can see 0 reserves and !hasActiveRound → glimpseLocked and the locked-branch effect.
+    setHasActiveRound(true);
     lastRoundConsumedReserveRef.current = false;
     if (!skipDebit) {
       deductGlimpseAttempt();
