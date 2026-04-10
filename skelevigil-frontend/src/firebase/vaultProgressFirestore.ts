@@ -208,6 +208,18 @@ export async function transactionRecordGlimpseSuccess(uid: string): Promise<{
   return { grantedFreeAttempt };
 }
 
+function nextProgressAfterGlimpseDebit(prev: VaultProgress): VaultProgress {
+  const attemptsLeft = {
+    ...prev.attemptsLeft,
+    glimpse: Math.max(0, prev.attemptsLeft.glimpse - 1),
+  };
+  return {
+    ...prev,
+    attemptsLeft,
+    creditsTowardFreeMission: Math.max(0, FREE_MISSION_CREDIT_ALLOWANCE - prev.successfulMissions),
+  };
+}
+
 export async function transactionRecordGlimpseFailure(uid: string): Promise<void> {
   const ref = vaultDocRef(uid);
   await runTransaction(getFirebaseFirestore(), async (tx) => {
@@ -215,15 +227,20 @@ export async function transactionRecordGlimpseFailure(uid: string): Promise<void
     const prev = snap.exists()
       ? progressFromDoc(snap.data() as Record<string, unknown>)
       : DEFAULT_VAULT_PROGRESS;
-    const attemptsLeft = {
-      ...prev.attemptsLeft,
-      glimpse: Math.max(0, prev.attemptsLeft.glimpse - 1),
-    };
-    const next: VaultProgress = {
-      ...prev,
-      attemptsLeft,
-      creditsTowardFreeMission: Math.max(0, FREE_MISSION_CREDIT_ALLOWANCE - prev.successfulMissions),
-    };
+    const next = nextProgressAfterGlimpseDebit(prev);
+    tx.set(ref, toFirestorePayload(next), { merge: true });
+  });
+}
+
+/** Spend one Glimpse reserve (e.g. New Mission) without recording a failed mission. */
+export async function transactionDeductGlimpseAttempt(uid: string): Promise<void> {
+  const ref = vaultDocRef(uid);
+  await runTransaction(getFirebaseFirestore(), async (tx) => {
+    const snap = await tx.get(ref);
+    const prev = snap.exists()
+      ? progressFromDoc(snap.data() as Record<string, unknown>)
+      : DEFAULT_VAULT_PROGRESS;
+    const next = nextProgressAfterGlimpseDebit(prev);
     tx.set(ref, toFirestorePayload(next), { merge: true });
   });
 }

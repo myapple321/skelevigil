@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,10 +20,12 @@ import {
 import { playTileFailSfx } from '@/src/audio/tileFailSfx';
 import { playTileRevealSfx } from '@/src/audio/tileRevealSfx';
 import { GlimpseRevealBoard } from '@/src/components/game/GlimpseRevealBoard';
+import { GLIMPSE_HELP_HINT, GLIMPSE_HELP_SUMMARY } from '@/src/content/glimpsePhaseHelp';
 import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
 import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
 import { shuffledGlimpseGreyPalette } from '@/src/game/glimpsePalette';
 import { generateRandomNeuralBlocks, neuralBlockToTileIndex } from '@/src/game/neuralBlocks';
+import type { VaultAttemptsLeft } from '@/src/preferences/vaultProgress';
 import { SV } from '@/src/theme/skelevigil';
 
 const MEMORIZE_MS = 5000;
@@ -29,9 +33,34 @@ const SCAN_MS = 2000;
 const PLAY_TIME_SEC = 25;
 const TIMEOUT_AMBER = '#FFBF00';
 
+/** Vigil currently implements The Glimpse only — reserves use the Glimpse tier. */
+const VIGIL_VAULT_PHASE: keyof VaultAttemptsLeft = 'glimpse';
+
+/**
+ * Restored when the mission-success modal closes. Must include `display: 'flex'` so the bar
+ * becomes interactive again after `display: 'none'` (React Navigation can merge styles and leave
+ * `none` applied otherwise).
+ */
+const MAIN_TAB_BAR_STYLE = {
+  display: 'flex' as const,
+  backgroundColor: SV.abyss,
+  borderTopColor: 'rgba(0,255,255,0.2)',
+} as const;
+
+/**
+ * Set when the Vigil tab blurs; consumed on next focus to enter `paused` (survives screen remount).
+ */
+let vigilPausedAfterNextTabFocus = false;
+
 export default function VigilScreen() {
+  const navigation = useNavigation();
   const { sfxEnabled } = useSfxPreference();
-  const { progress, recordGlimpseFailure, recordGlimpseSuccess } = useVaultProgress();
+  const {
+    progress,
+    recordGlimpseFailure,
+    recordGlimpseSuccess,
+    deductGlimpseAttempt,
+  } = useVaultProgress();
   const { width } = useWindowDimensions();
   const gridSize = Math.min(Math.max(width - 40, 220), 360);
   const scale = gridSize / GLIMPSE_PREVIEW_SIZE;
@@ -39,15 +68,25 @@ export default function VigilScreen() {
   const cellGap = Math.max(2, Math.round(GLIMPSE_CELL_GAP * scale));
 
   const [neuralBlocks, setNeuralBlocks] = useState(() => generateRandomNeuralBlocks());
-  const [phase, setPhase] = useState<'memorize' | 'play'>('memorize');
+  /** Start idle until the first New Mission (no auto-memorize on first land). */
+  const [phase, setPhase] = useState<'memorize' | 'play' | 'paused'>('paused');
   const [memorizeSecondsLeft, setMemorizeSecondsLeft] = useState(5);
   const [failedIndex, setFailedIndex] = useState<number | null>(null);
   const [timedOut, setTimedOut] = useState(false);
   const [playSecondsLeft, setPlaySecondsLeft] = useState(PLAY_TIME_SEC);
-  const [passedExcavation, setPassedExcavation] = useState(false);
   const [scanProgress, setScanProgress] = useState<number | null>(null);
   const [finishPulse, setFinishPulse] = useState(false);
   const [successPulseToken, setSuccessPulseToken] = useState(0);
+  const [reservesEmptyModalVisible, setReservesEmptyModalVisible] = useState(false);
+  const [missionSuccessModalVisible, setMissionSuccessModalVisible] = useState(false);
+  /** After a won round: stay on solved grid until the user taps New Mission (no auto-shuffle on Continue). */
+  const [awaitingNewMissionAfterSuccess, setAwaitingNewMissionAfterSuccess] = useState(false);
+  const [infoModal, setInfoModal] = useState<{ title: string; body: string } | null>(null);
+
+  const missionSuccessOpenRef = useRef(missionSuccessModalVisible);
+  const awaitingWinStandbyRef = useRef(awaitingNewMissionAfterSuccess);
+  missionSuccessOpenRef.current = missionSuccessModalVisible;
+  awaitingWinStandbyRef.current = awaitingNewMissionAfterSuccess;
 
   const [gridColors, setGridColors] = useState(() => shuffledGlimpseGreyPalette());
   const [revealed, setRevealed] = useState<boolean[]>(() =>
@@ -56,56 +95,171 @@ export default function VigilScreen() {
   const revealedRef = useRef(revealed);
   revealedRef.current = revealed;
   const finishScanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const memorizeTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const memorizeDoneRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** True after the user has started at least one sortie (New Mission); used for paused hint copy. */
+  const hasBegunSortieRef = useRef(false);
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
   const timedOutRef = useRef(timedOut);
   const outcomeCommittedRef = useRef(false);
+  /** After a failed round, the next New Mission does not debit again (failure already consumed a reserve). */
+  const lastRoundConsumedReserveRef = useRef(false);
+  /** This grid was paid for via New Mission debit; failure should not also call recordGlimpseFailure. */
+  const paidForCurrentRoundRef = useRef(false);
   timedOutRef.current = timedOut;
-  const glimpseLocked = progress.attemptsLeft.glimpse <= 0;
+
+  const glimpseReserves = progress.attemptsLeft[VIGIL_VAULT_PHASE];
+  const glimpseLocked = glimpseReserves <= 0;
+
+  const neuralTileSetForUi = useMemo(
+    () => new Set(neuralBlocks.map(neuralBlockToTileIndex)),
+    [neuralBlocks],
+  );
+  const hasRevealedSafeTile = useMemo(
+    () => revealed.some((isRev, idx) => isRev && !neuralTileSetForUi.has(idx)),
+    [revealed, neuralTileSetForUi],
+  );
+
+  const applyNewGridShuffle = useCallback(() => {
+    outcomeCommittedRef.current = false;
+    setPhase('memorize');
+    setMemorizeSecondsLeft(5);
+    setNeuralBlocks(generateRandomNeuralBlocks());
+    setGridColors(shuffledGlimpseGreyPalette());
+    setFailedIndex(null);
+    setTimedOut(false);
+    setScanProgress(null);
+    if (finishScanTimerRef.current) {
+      clearInterval(finishScanTimerRef.current);
+      finishScanTimerRef.current = null;
+    }
+    setFinishPulse(false);
+    setAwaitingNewMissionAfterSuccess(false);
+    hasBegunSortieRef.current = true;
+    const fresh = Array.from({ length: 25 }, () => false);
+    revealedRef.current = fresh;
+    setRevealed(fresh);
+  }, []);
+
+  const onDismissMissionSuccess = useCallback(() => {
+    setMissionSuccessModalVisible(false);
+  }, []);
+
+  useLayoutEffect(() => {
+    const tabNav = navigation.getParent();
+    if (!tabNav) return;
+
+    const showTabBar = () => {
+      tabNav.setOptions({
+        tabBarStyle: { ...MAIN_TAB_BAR_STYLE },
+      });
+    };
+    const hideTabBar = () => {
+      tabNav.setOptions({
+        tabBarStyle: { display: 'none' },
+      });
+    };
+
+    if (missionSuccessModalVisible) {
+      hideTabBar();
+    } else {
+      showTabBar();
+    }
+    return () => {
+      showTabBar();
+    };
+  }, [missionSuccessModalVisible, navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (vigilPausedAfterNextTabFocus) {
+        vigilPausedAfterNextTabFocus = false;
+        if (!missionSuccessOpenRef.current && !awaitingWinStandbyRef.current) {
+          if (memorizeTickRef.current) {
+            clearInterval(memorizeTickRef.current);
+            memorizeTickRef.current = null;
+          }
+          if (memorizeDoneRef.current) {
+            clearTimeout(memorizeDoneRef.current);
+            memorizeDoneRef.current = null;
+          }
+          setPhase('paused');
+          setScanProgress(null);
+          if (finishScanTimerRef.current) {
+            clearInterval(finishScanTimerRef.current);
+            finishScanTimerRef.current = null;
+          }
+        }
+      }
+      return () => {
+        vigilPausedAfterNextTabFocus = true;
+      };
+    }, []),
+  );
 
   const commitMissionSuccess = () => {
     if (outcomeCommittedRef.current) return;
     outcomeCommittedRef.current = true;
+    paidForCurrentRoundRef.current = false;
     recordGlimpseSuccess();
   };
 
   const commitMissionFailure = () => {
     if (outcomeCommittedRef.current) return;
     outcomeCommittedRef.current = true;
-    recordGlimpseFailure();
+    lastRoundConsumedReserveRef.current = true;
+    if (paidForCurrentRoundRef.current) {
+      paidForCurrentRoundRef.current = false;
+    } else {
+      recordGlimpseFailure();
+    }
   };
 
   useEffect(() => {
-    outcomeCommittedRef.current = false;
     if (glimpseLocked) {
+      outcomeCommittedRef.current = false;
       setPhase('play');
       setMemorizeSecondsLeft(0);
       setFailedIndex(null);
       setTimedOut(false);
-      setPassedExcavation(false);
       setPlaySecondsLeft(PLAY_TIME_SEC);
       return;
     }
+    // Do not depend on `phase` here: when memorize ends and sets phase to 'play', re-running would
+    // restart memorize in an infinite loop. Read latest phase via ref for guards only.
+    if (phaseRef.current === 'paused') return;
+    if (awaitingNewMissionAfterSuccess) return;
+
+    outcomeCommittedRef.current = false;
     setPhase('memorize');
     setMemorizeSecondsLeft(5);
     setFailedIndex(null);
     setTimedOut(false);
-    setPassedExcavation(false);
     const tick = setInterval(() => {
       setMemorizeSecondsLeft((s) => (s <= 1 ? 0 : s - 1));
     }, 1000);
+    memorizeTickRef.current = tick;
     const done = setTimeout(() => {
       clearInterval(tick);
+      memorizeTickRef.current = null;
+      memorizeDoneRef.current = null;
       setPhase('play');
     }, MEMORIZE_MS);
+    memorizeDoneRef.current = done;
     return () => {
       clearInterval(tick);
       clearTimeout(done);
+      memorizeTickRef.current = null;
+      memorizeDoneRef.current = null;
     };
-  }, [neuralBlocks, glimpseLocked]);
+  }, [neuralBlocks, glimpseLocked, awaitingNewMissionAfterSuccess]);
 
   useEffect(() => {
     if (glimpseLocked) return;
     if (phase !== 'play') return;
-    if (failedIndex != null || passedExcavation || timedOut) return;
+    if (awaitingNewMissionAfterSuccess) return;
+    if (failedIndex != null || timedOut) return;
 
     setPlaySecondsLeft(PLAY_TIME_SEC);
     const id = setInterval(() => {
@@ -123,37 +277,31 @@ export default function VigilScreen() {
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [phase, neuralBlocks, failedIndex, passedExcavation, timedOut, glimpseLocked]);
+  }, [phase, neuralBlocks, failedIndex, timedOut, glimpseLocked, awaitingNewMissionAfterSuccess]);
 
   useEffect(() => {
     if (!timedOut) return;
     commitMissionFailure();
   }, [timedOut]);
 
-  const startNewGame = () => {
-    if (glimpseLocked) return;
-    outcomeCommittedRef.current = false;
-    setPhase('memorize');
-    setMemorizeSecondsLeft(5);
-    setNeuralBlocks(generateRandomNeuralBlocks());
-    setGridColors(shuffledGlimpseGreyPalette());
-    setFailedIndex(null);
-    setTimedOut(false);
-    setPassedExcavation(false);
-    setScanProgress(null);
-    if (finishScanTimerRef.current) {
-      clearInterval(finishScanTimerRef.current);
-      finishScanTimerRef.current = null;
+  const onNewMission = () => {
+    if (glimpseReserves <= 0) {
+      setReservesEmptyModalVisible(true);
+      return;
     }
-    setFinishPulse(false);
-    const fresh = Array.from({ length: 25 }, () => false);
-    revealedRef.current = fresh;
-    setRevealed(fresh);
+    const skipDebit = lastRoundConsumedReserveRef.current;
+    lastRoundConsumedReserveRef.current = false;
+    if (!skipDebit) {
+      deductGlimpseAttempt();
+    }
+    paidForCurrentRoundRef.current = !skipDebit;
+    applyNewGridShuffle();
   };
 
   const onRevealCell = (index: number) => {
     if (glimpseLocked) return;
     if (phase !== 'play') return;
+    if (awaitingNewMissionAfterSuccess) return;
     if (failedIndex != null || timedOut) return;
     if (revealedRef.current[index]) return;
 
@@ -161,7 +309,6 @@ export default function VigilScreen() {
     if (neuralTileSet.has(index)) {
       setFailedIndex(index);
       setTimedOut(false);
-      setPassedExcavation(false);
       commitMissionFailure();
       if (sfxEnabled) void playTileFailSfx();
       return;
@@ -178,21 +325,21 @@ export default function VigilScreen() {
   };
 
   const onOpenFinishHelp = () => {
-    Alert.alert(
-      'Finish Excavation',
-      'Tap this when you believe you have safely revealed the entire Hidden Path. The system will scan your excavation to see if the Strand is still intact.',
-    );
+    setInfoModal({ title: 'Summary', body: GLIMPSE_HELP_SUMMARY });
   };
 
   const onOpenNewGameHelp = () => {
-    Alert.alert('New Mission', 'Tap here to reset the vault and begin a fresh mission.');
+    setInfoModal({ title: 'Hint', body: GLIMPSE_HELP_HINT });
   };
 
   const onFinishExcavation = () => {
     if (glimpseLocked) return;
     if (phase !== 'play') return;
+    if (awaitingNewMissionAfterSuccess) return;
+    if (outcomeCommittedRef.current) return;
     if (failedIndex != null || timedOut) return;
     if (scanProgress != null) return;
+    if (!hasRevealedSafeTile) return;
 
     setFinishPulse(true);
     setTimeout(() => setFinishPulse(false), 220);
@@ -223,19 +370,19 @@ export default function VigilScreen() {
           !timedOutRef.current;
 
         if (success) {
-          setPassedExcavation(true);
-          setSuccessPulseToken((n) => n + 1);
           commitMissionSuccess();
           const fullyRevealed = Array.from({ length: 25 }, () => true);
           revealedRef.current = fullyRevealed;
           setRevealed(fullyRevealed);
+          setSuccessPulseToken((n) => n + 1);
+          setAwaitingNewMissionAfterSuccess(true);
+          setMissionSuccessModalVisible(true);
           return;
         }
 
         const firstNeuralIdx = neuralBlocks.length > 0 ? neuralBlockToTileIndex(neuralBlocks[0]!) : 0;
         setFailedIndex(firstNeuralIdx);
         setTimedOut(false);
-        setPassedExcavation(false);
         commitMissionFailure();
         if (sfxEnabled) void playTileFailSfx();
       }
@@ -243,8 +390,112 @@ export default function VigilScreen() {
     finishScanTimerRef.current = timer;
   };
 
+  const finishDisabled =
+    glimpseLocked ||
+    phase !== 'play' ||
+    awaitingNewMissionAfterSuccess ||
+    failedIndex != null ||
+    timedOut ||
+    scanProgress != null ||
+    !hasRevealedSafeTile;
+
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <Modal
+        visible={missionSuccessModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}>
+        <View
+          style={styles.modalBackdrop}
+          accessibilityViewIsModal
+          importantForAccessibility="yes">
+          <View style={styles.successModalCard}>
+            <Text style={styles.successModalEyebrow}>Mission Complete</Text>
+            <Text style={styles.successModalTitle}>Excavation Secured</Text>
+            <Text style={styles.successModalBody}>
+              The Hidden Path is clear and the Strand remains intact. Your success has been logged to
+              the Vault.
+            </Text>
+            <Pressable
+              onPress={onDismissMissionSuccess}
+              style={({ pressed }) => [
+                styles.modalPrimary,
+                pressed && styles.modalPrimaryPressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Continue">
+              <Text style={styles.modalPrimaryText}>Continue</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={reservesEmptyModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReservesEmptyModalVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFillObject}
+            onPress={() => setReservesEmptyModalVisible(false)}
+            accessibilityLabel="Dismiss"
+          />
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Mission Reserves Empty</Text>
+            <Text style={styles.modalBody}>
+              Please visit the Vault to restore your connection.
+            </Text>
+            <Pressable
+              onPress={() => {
+                setReservesEmptyModalVisible(false);
+                router.push('/(main)/vault');
+              }}
+              style={({ pressed }) => [styles.modalPrimary, pressed && styles.modalPrimaryPressed]}>
+              <Text style={styles.modalPrimaryText}>Open Vault</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setReservesEmptyModalVisible(false)}
+              style={({ pressed }) => [styles.modalSecondary, pressed && styles.modalSecondaryPressed]}>
+              <Text style={styles.modalSecondaryText}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={infoModal != null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setInfoModal(null)}>
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFillObject}
+            onPress={() => setInfoModal(null)}
+            accessibilityLabel="Dismiss"
+          />
+          <View style={styles.modalCard}>
+            {infoModal ? (
+              <>
+                <Text style={styles.modalSectionLabel}>{infoModal.title}</Text>
+                <ScrollView
+                  style={styles.modalScroll}
+                  contentContainerStyle={styles.modalScrollContent}
+                  showsVerticalScrollIndicator>
+                  <Text style={styles.modalBodyLeft}>{infoModal.body}</Text>
+                </ScrollView>
+              </>
+            ) : null}
+            <Pressable
+              onPress={() => setInfoModal(null)}
+              style={({ pressed }) => [styles.modalPrimary, pressed && styles.modalPrimaryPressed]}>
+              <Text style={styles.modalPrimaryText}>OK</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
@@ -257,17 +508,23 @@ export default function VigilScreen() {
           <Text style={styles.memorizeHint} accessibilityLiveRegion="polite">
             Memorize the neural blocks. Tiles return in {memorizeSecondsLeft}s.
           </Text>
-        ) : passedExcavation ? (
-          <Text style={styles.successHint} accessibilityLiveRegion="polite">
-            Success! You revealed the pattern perfectly. Tap 'New Mission' to start again.
+        ) : phase === 'paused' ? (
+          <Text style={styles.tabReturnHint} accessibilityLiveRegion="polite">
+            {hasBegunSortieRef.current
+              ? "Session paused. Tap 'New Mission' when you are ready to continue."
+              : "Mission grid is idle. Tap 'New Mission' to deploy your first sortie."}
+          </Text>
+        ) : awaitingNewMissionAfterSuccess ? (
+          <Text style={styles.successStandbyHint} accessibilityLiveRegion="polite">
+            Excavation secured. Tap &apos;New Mission&apos; when you are ready for the next sortie.
           </Text>
         ) : timedOut ? (
           <Text style={styles.timeoutHint} accessibilityLiveRegion="polite">
-            Time limit reached. This attempt is over. Tap 'New Mission' to start again.
+            The excavation has collapsed. Tap &apos;New Mission&apos; to attempt a re-sync.
           </Text>
         ) : failedIndex != null ? (
           <Text style={styles.failHint} accessibilityLiveRegion="polite">
-            The Strand has shattered. Tap 'New Mission' to start again.
+            The Strand has shattered. Tap &apos;New Mission&apos; to start again.
           </Text>
         ) : phase === 'play' ? (
           <View
@@ -292,7 +549,9 @@ export default function VigilScreen() {
             failedIndex={failedIndex}
             timedOut={timedOut}
             excavationPressureFraction={
-              phase === 'play' && failedIndex == null && !passedExcavation
+              phase === 'play' &&
+              failedIndex == null &&
+              !awaitingNewMissionAfterSuccess
                 ? timedOut
                   ? 1
                   : (PLAY_TIME_SEC - playSecondsLeft) / PLAY_TIME_SEC
@@ -316,13 +575,8 @@ export default function VigilScreen() {
             <Text style={styles.newGameInfoText}>i</Text>
           </Pressable>
           <Pressable
-            onPress={startNewGame}
-            disabled={glimpseLocked}
-            style={({ pressed }) => [
-              styles.newGameBtn,
-              pressed && styles.newGameBtnPressed,
-              glimpseLocked && styles.newGameBtnDisabled,
-            ]}
+            onPress={onNewMission}
+            style={({ pressed }) => [styles.newGameBtn, pressed && styles.newGameBtnPressed]}
             accessibilityRole="button"
             accessibilityLabel="New mission, shuffle the grid">
             <Text style={styles.newGameBtnText}>New Mission</Text>
@@ -338,19 +592,12 @@ export default function VigilScreen() {
           </Pressable>
           <Pressable
             onPress={onFinishExcavation}
-            disabled={
-              glimpseLocked || phase !== 'play' || failedIndex != null || timedOut || scanProgress != null
-            }
+            disabled={finishDisabled}
             style={({ pressed }) => [
               styles.finishBtn,
               pressed && styles.finishBtnPressed,
               finishPulse && styles.finishBtnPulse,
-              (glimpseLocked ||
-                phase !== 'play' ||
-                failedIndex != null ||
-                timedOut ||
-                scanProgress != null) &&
-                styles.finishBtnDisabled,
+              finishDisabled && styles.finishBtnDisabled,
             ]}
             accessibilityRole="button"
             accessibilityLabel="Finish Excavation">
@@ -462,7 +709,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     maxWidth: 360,
   },
-  successHint: {
+  successStandbyHint: {
     color: SV.neonCyan,
     fontSize: 14,
     fontWeight: '700',
@@ -472,6 +719,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     backgroundColor: 'rgba(0,255,255,0.08)',
+    borderRadius: 8,
+    maxWidth: 360,
+  },
+  tabReturnHint: {
+    color: SV.neonCyan,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(0,255,255,0.06)',
     borderRadius: 8,
     maxWidth: 360,
   },
@@ -518,19 +778,11 @@ const styles = StyleSheet.create({
   newGameBtnPressed: {
     opacity: 0.88,
   },
-  newGameBtnDisabled: {
-    opacity: 0.55,
-  },
   newGameBtnText: {
     color: SV.surgicalWhite,
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
-  },
-  finishWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   finishBottomRow: {
     marginTop: 0,
@@ -586,5 +838,129 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     textAlign: 'center',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 28,
+  },
+  successModalCard: {
+    width: '100%',
+    maxWidth: 300,
+    backgroundColor: SV.gunmetal,
+    borderRadius: 14,
+    paddingVertical: 22,
+    paddingHorizontal: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,255,0.32)',
+    zIndex: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+  },
+  successModalEyebrow: {
+    color: SV.surgicalWhite,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    marginBottom: 8,
+    opacity: 0.85,
+  },
+  successModalTitle: {
+    color: SV.neonCyan,
+    fontSize: 19,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  successModalBody: {
+    color: SV.surgicalWhite,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 340,
+    maxHeight: '82%',
+    backgroundColor: SV.gunmetal,
+    borderRadius: 12,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,255,0.25)',
+    zIndex: 1,
+  },
+  modalTitle: {
+    color: SV.neonCyan,
+    fontSize: 17,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  modalSectionLabel: {
+    color: SV.neonCyan,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  modalBody: {
+    color: SV.surgicalWhite,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  modalBodyLeft: {
+    color: SV.surgicalWhite,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'left',
+  },
+  modalScroll: {
+    maxHeight: 280,
+    marginBottom: 14,
+  },
+  modalScrollContent: {
+    paddingBottom: 4,
+  },
+  modalPrimary: {
+    alignSelf: 'center',
+    backgroundColor: SV.neonCyan,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  modalPrimaryPressed: {
+    opacity: 0.88,
+  },
+  modalPrimaryText: {
+    color: SV.black,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  modalSecondary: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  modalSecondaryPressed: {
+    opacity: 0.75,
+  },
+  modalSecondaryText: {
+    color: SV.surgicalWhite,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

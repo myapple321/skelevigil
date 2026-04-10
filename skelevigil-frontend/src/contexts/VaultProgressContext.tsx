@@ -20,6 +20,7 @@ import {
   seedVaultDocIfMissing,
   subscribeVaultProgress,
   transactionDebugBuyThreeGlimpse,
+  transactionDeductGlimpseAttempt,
   transactionGrantMonthlyGiftRotation,
   transactionRecordGlimpseFailure,
   transactionRecordGlimpseSuccess,
@@ -56,6 +57,7 @@ type VaultProgressContextValue = {
   hydrated: boolean;
   recordGlimpseSuccess: () => void;
   recordGlimpseFailure: () => void;
+  deductGlimpseAttempt: () => void;
   debugBuyThreeVaultCredits: () => void;
   claimMonthlyGiftNotificationReward: () => Promise<void>;
 };
@@ -174,6 +176,27 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
     }));
   }, [firestoreUid, updateLocalOnly]);
 
+  const deductGlimpseAttempt = useCallback(() => {
+    if (firestoreUid) {
+      void (async () => {
+        try {
+          await transactionDeductGlimpseAttempt(firestoreUid);
+        } catch (err) {
+          alertVaultFirestoreError(err, 'save');
+        }
+      })();
+      return;
+    }
+
+    updateLocalOnly((prev) => ({
+      ...prev,
+      attemptsLeft: {
+        ...prev.attemptsLeft,
+        glimpse: Math.max(0, prev.attemptsLeft.glimpse - 1),
+      },
+    }));
+  }, [firestoreUid, updateLocalOnly]);
+
   const debugBuyThreeVaultCredits = useCallback(() => {
     if (firestoreUid) {
       void (async () => {
@@ -261,6 +284,7 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
       hydrated,
       recordGlimpseSuccess,
       recordGlimpseFailure,
+      deductGlimpseAttempt,
       debugBuyThreeVaultCredits,
       claimMonthlyGiftNotificationReward,
     }),
@@ -269,6 +293,7 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
       hydrated,
       recordGlimpseSuccess,
       recordGlimpseFailure,
+      deductGlimpseAttempt,
       debugBuyThreeVaultCredits,
       claimMonthlyGiftNotificationReward,
     ],

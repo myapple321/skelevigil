@@ -12,6 +12,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 
 import { GlimpseBlockGrid } from '@/src/components/game/GlimpseBlockGrid';
+import {
+  GLIMPSE_HELP_HINT,
+  GLIMPSE_HELP_SUMMARY,
+} from '@/src/content/glimpsePhaseHelp';
 import { buildGlimpseGreyPalette } from '@/src/game/glimpsePalette';
 import { SV } from '@/src/theme/skelevigil';
 
@@ -40,10 +44,8 @@ function PhaseBriefingBody({ phase }: { phase: PhaseInfoId }) {
             label="Objective"
             body="Memorize the path, then excavate the 25 surrounding blocks."
           />
-          <BriefSection
-            label="Summary"
-            body='Focus on the Square architecture. You have a limited time to reveal the tiles that do not contain the Strand. Tap Finish Excavation once the path is clear.'
-          />
+          <BriefSection label="Summary" body={GLIMPSE_HELP_SUMMARY} />
+          <BriefSection label="Hint" body={GLIMPSE_HELP_HINT} />
         </>
       ) : null}
       {phase === 'stare' ? (
