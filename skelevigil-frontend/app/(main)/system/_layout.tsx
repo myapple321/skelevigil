@@ -38,6 +38,26 @@ export default function SystemLayout() {
           headerLeft: () => <SvHeaderBack />,
         }}
       />
+      <Stack.Screen
+        name="privacy-policy"
+        options={{
+          title: 'Privacy Policy',
+          headerBackTitleVisible: false,
+          headerStyle: { backgroundColor: '#000000' },
+          contentStyle: { backgroundColor: '#000000' },
+          headerLeft: () => <SvHeaderBack />,
+        }}
+      />
+      <Stack.Screen
+        name="terms-of-service"
+        options={{
+          title: 'Terms of Service',
+          headerBackTitleVisible: false,
+          headerStyle: { backgroundColor: '#000000' },
+          contentStyle: { backgroundColor: '#000000' },
+          headerLeft: () => <SvHeaderBack />,
+        }}
+      />
     </Stack>
   );
 }

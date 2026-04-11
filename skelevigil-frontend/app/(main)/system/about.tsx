@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { router } from 'expo-router';
 import {
   Alert,
   Linking,
@@ -46,10 +47,6 @@ export default function AboutSkeleVigilScreen() {
     });
   };
 
-  const placeholderDoc = (label: string) => {
-    Alert.alert(label, 'This link will be available in a future update.');
-  };
-
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView
@@ -83,18 +80,18 @@ export default function AboutSkeleVigilScreen() {
 
         <Text style={[styles.sectionTitle, styles.sectionSpaced]}>Legal &amp; Support</Text>
         <Pressable
-          onPress={() => placeholderDoc('Privacy Policy')}
+          onPress={() => router.push('/(main)/system/privacy-policy')}
           style={({ pressed }) => [styles.linkRow, pressed && styles.linkPressed]}
           accessibilityRole="link"
-          accessibilityLabel="Privacy Policy, placeholder">
-          <Text style={styles.linkText}>Privacy Policy (Placeholder Link)</Text>
+          accessibilityLabel="Privacy Policy">
+          <Text style={styles.linkText}>Privacy Policy</Text>
         </Pressable>
         <Pressable
-          onPress={() => placeholderDoc('Terms of Service')}
+          onPress={() => router.push('/(main)/system/terms-of-service')}
           style={({ pressed }) => [styles.linkRow, pressed && styles.linkPressed]}
           accessibilityRole="link"
-          accessibilityLabel="Terms of Service, placeholder">
-          <Text style={styles.linkText}>Terms of Service (Placeholder Link)</Text>
+          accessibilityLabel="Terms of Service">
+          <Text style={styles.linkText}>Terms of Service</Text>
         </Pressable>
 
         <Text style={[styles.subheading, styles.contactHeading]}>Contact Us</Text>
