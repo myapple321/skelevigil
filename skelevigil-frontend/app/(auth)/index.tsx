@@ -347,9 +347,7 @@ export default function LoginLandingScreen() {
             style={({ pressed }) => [
               styles.guestButton,
               pressed && styles.guestButtonPressed,
-              (googleBusy || appleBusy) && styles.guestButtonDisabled,
-            ]}
-            disabled={googleBusy || appleBusy}>
+            ]}>
             <Text style={styles.guestButtonText}>Log in as Guest</Text>
           </Pressable>
         </View>
@@ -402,9 +400,6 @@ const styles = StyleSheet.create({
   },
   guestButtonPressed: {
     opacity: 0.85,
-  },
-  guestButtonDisabled: {
-    opacity: 0.45,
   },
   guestButtonText: {
     color: SV.neonCyan,
