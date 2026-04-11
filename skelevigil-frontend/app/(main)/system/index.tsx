@@ -75,6 +75,7 @@ function MissionAlertsRow() {
           <Text style={styles.missionToggleTitle}>Mission Alerts</Text>
           <Text style={styles.missionToggleSub}>
             Enable to receive mission briefings, recovery reminders, and monthly free mission rewards.
+            {' Default is off.'}
           </Text>
         </View>
       </View>
@@ -102,7 +103,7 @@ function SoundEffectsRow() {
         <Ionicons name="volume-high-outline" size={22} color={SV.neonCyan} style={styles.rowIcon} />
         <View style={styles.toggleTextBlock}>
           <Text style={styles.toggleTitle}>Sound effects</Text>
-          <Text style={styles.toggleSub}>Short sound when a tile is revealed.</Text>
+          <Text style={styles.toggleSub}>Short sound when a tile is revealed. Default is off.</Text>
         </View>
       </View>
       <Switch
