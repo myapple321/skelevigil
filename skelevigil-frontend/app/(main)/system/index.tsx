@@ -4,7 +4,7 @@ import { FirebaseError } from 'firebase/app';
 import { router } from 'expo-router';
 import { deleteUser, signOut, type User } from 'firebase/auth';
 import type { ComponentProps } from 'react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   Platform,
@@ -149,6 +149,31 @@ export default function SystemIndexScreen() {
   const { missionAlertsEnabled, hydrated: missionAlertsHydrated } = useMissionAlert();
 
   const debugMissionAlertsReady = missionAlertsHydrated && missionAlertsEnabled;
+
+  type DebugActionKey = 'buy' | 'reengagement' | 'monthlyGift';
+  const [debugActionBusy, setDebugActionBusy] = useState<DebugActionKey | null>(null);
+  const debugAsyncGateRef = useRef(false);
+
+  /** Notify DEBUG actions often resolve in a few ms — keep dim visible long enough to perceive. */
+  const DEBUG_ACTION_MIN_DIM_MS = 520;
+
+  const runDebugAsync = useCallback(async (key: DebugActionKey, fn: () => Promise<void>) => {
+    if (debugAsyncGateRef.current) return;
+    debugAsyncGateRef.current = true;
+    setDebugActionBusy(key);
+    const started = Date.now();
+    try {
+      await fn();
+    } finally {
+      const elapsed = Date.now() - started;
+      const remainder = Math.max(0, DEBUG_ACTION_MIN_DIM_MS - elapsed);
+      if (remainder > 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, remainder));
+      }
+      debugAsyncGateRef.current = false;
+      setDebugActionBusy(null);
+    }
+  }, []);
 
   const closeDeleteModal = () => {
     if (deleteBusy) return;
@@ -336,8 +361,13 @@ export default function SystemIndexScreen() {
             <View style={styles.debugDividerLine} />
           </View>
           <Pressable
-            onPress={debugBuyThreeVaultCredits}
-            style={({ pressed }) => [styles.debugBuyBtn, pressed && styles.debugBuyPressed]}>
+            onPress={() => void runDebugAsync('buy', () => debugBuyThreeVaultCredits())}
+            accessibilityState={{ busy: debugActionBusy === 'buy' }}
+            style={({ pressed }) => [
+              styles.debugBuyBtn,
+              debugActionBusy === 'buy' && styles.debugBuyDimmed,
+              pressed && debugActionBusy === null && styles.debugBuyPressed,
+            ]}>
             <Text style={styles.debugBuyText}>DEBUG [Buy 3 Vault Credits - $0.99]</Text>
           </Pressable>
           {Platform.OS !== 'web' ? (
@@ -348,12 +378,18 @@ export default function SystemIndexScreen() {
                     ? undefined
                     : 'Turn on Mission Alerts in Preferences first.'
                 }
-                accessibilityState={{ disabled: !debugMissionAlertsReady }}
-                onPress={() => void debugScheduleReengagementInSeconds(3)}
+                accessibilityState={{
+                  disabled: !debugMissionAlertsReady,
+                  busy: debugActionBusy === 'reengagement',
+                }}
+                onPress={() =>
+                  void runDebugAsync('reengagement', () => debugScheduleReengagementInSeconds(3))
+                }
                 disabled={!debugMissionAlertsReady}
                 style={({ pressed }) => [
                   styles.debugBuyBtn,
-                  pressed && debugMissionAlertsReady && styles.debugBuyPressed,
+                  debugActionBusy === 'reengagement' && styles.debugBuyDimmed,
+                  pressed && debugMissionAlertsReady && debugActionBusy === null && styles.debugBuyPressed,
                   !debugMissionAlertsReady && styles.debugBuyBtnDisabled,
                 ]}>
                 <Text
@@ -370,12 +406,18 @@ export default function SystemIndexScreen() {
                     ? undefined
                     : 'Turn on Mission Alerts in Preferences first.'
                 }
-                accessibilityState={{ disabled: !debugMissionAlertsReady }}
-                onPress={() => void debugScheduleMonthlyGiftInSeconds(3)}
+                accessibilityState={{
+                  disabled: !debugMissionAlertsReady,
+                  busy: debugActionBusy === 'monthlyGift',
+                }}
+                onPress={() =>
+                  void runDebugAsync('monthlyGift', () => debugScheduleMonthlyGiftInSeconds(3))
+                }
                 disabled={!debugMissionAlertsReady}
                 style={({ pressed }) => [
                   styles.debugBuyBtn,
-                  pressed && debugMissionAlertsReady && styles.debugBuyPressed,
+                  debugActionBusy === 'monthlyGift' && styles.debugBuyDimmed,
+                  pressed && debugMissionAlertsReady && debugActionBusy === null && styles.debugBuyPressed,
                   !debugMissionAlertsReady && styles.debugBuyBtnDisabled,
                 ]}>
                 <Text
@@ -557,6 +599,11 @@ const styles = StyleSheet.create({
   },
   debugBuyPressed: {
     opacity: 0.85,
+  },
+  /** Active DEBUG action in progress (awaiting async). */
+  debugBuyDimmed: {
+    opacity: 0.42,
+    backgroundColor: 'rgba(0,255,255,0.04)',
   },
   debugBuyText: {
     color: SV.neonCyan,

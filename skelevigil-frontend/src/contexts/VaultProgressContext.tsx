@@ -58,7 +58,7 @@ type VaultProgressContextValue = {
   recordGlimpseSuccess: () => void;
   recordGlimpseFailure: () => void;
   deductGlimpseAttempt: () => void;
-  debugBuyThreeVaultCredits: () => void;
+  debugBuyThreeVaultCredits: () => Promise<void>;
   claimMonthlyGiftNotificationReward: () => Promise<void>;
 };
 
@@ -197,15 +197,13 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
     }));
   }, [firestoreUid, updateLocalOnly]);
 
-  const debugBuyThreeVaultCredits = useCallback(() => {
+  const debugBuyThreeVaultCredits = useCallback(async (): Promise<void> => {
     if (firestoreUid) {
-      void (async () => {
-        try {
-          await transactionDebugBuyThreeGlimpse(firestoreUid);
-        } catch (err) {
-          alertVaultFirestoreError(err, 'update');
-        }
-      })();
+      try {
+        await transactionDebugBuyThreeGlimpse(firestoreUid);
+      } catch (err) {
+        alertVaultFirestoreError(err, 'update');
+      }
       return;
     }
 
