@@ -116,8 +116,9 @@ export default function HelpQuestionsScreen() {
 
         <Text style={styles.subheading}>Getting Started</Text>
         <Text style={styles.body}>
-          Begin your journey in the Phases tab. Select a difficulty level to enter the Vigil. Your goal
-          is to observe the neural block and secure the sequence before the time limit expires.
+          {`Your journey begins in the Phases tab. Select your desired difficulty level to establish a connection with the Vigil. Once inside, your goal is to observe the neural block and secure the underlying sequence before the excavation collapses.
+
+When you have correctly identified all nodes, tap Finish Excavation. This will finalize your progress and confirm if the neural strand is secured or if the mission has shattered.`}
         </Text>
 
         <Text style={[styles.subheading, styles.helpSubSpaced]}>Settings</Text>
