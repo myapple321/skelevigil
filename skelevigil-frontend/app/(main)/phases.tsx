@@ -107,7 +107,8 @@ function GlimpsePhasesPreview() {
 }
 
 const STARE_DIAMOND_ART = require('../../assets/phase-stare-diamond.png');
-const TRANCE_HEXAGON_ART = require('../../assets/phase-trance-hexagon.png');
+/** Luminance-mapped to amber (see assets); avoids RN tintColor flattening the hex grid. */
+const TRANCE_HEXAGON_ART = require('../../assets/phase-trance-hexagon-amber.png');
 
 /** Diamond lattice preview for The Stare (matches 5×10 diamond briefing). */
 function StarePhasePreview() {
@@ -121,14 +122,28 @@ function StarePhasePreview() {
   );
 }
 
-/** Honeycomb hex preview for The Trance (dual-plane briefing). */
+/**
+ * Dual-plane preview for The Trance: diamond plane (rear) + hex plane (front), hex shifted down
+ * by one-third of the tile so the top band shows the lower plane (Dual-Plato briefing).
+ */
 function TrancePhasePreview() {
   return (
     <View
       style={[styles.artFrame, styles.phasePreviewArtFrame]}
       accessibilityRole="image"
-      accessibilityLabel="Hexagon honeycomb pattern preview for The Trance phase">
-      <Image source={TRANCE_HEXAGON_ART} style={styles.phasePreviewArtImage} resizeMode="cover" />
+      accessibilityLabel="Dual-plane Trance preview: diamond layer with hex grid stacked and offset downward">
+      <View style={styles.tranceDualPlaneColumn}>
+        <Image
+          source={STARE_DIAMOND_ART}
+          style={styles.tranceDualPlaneLayer}
+          resizeMode="cover"
+        />
+        <Image
+          source={TRANCE_HEXAGON_ART}
+          style={[styles.tranceDualPlaneLayer, styles.tranceHexOverlay]}
+          resizeMode="cover"
+        />
+      </View>
     </View>
   );
 }
@@ -374,6 +389,26 @@ const styles = StyleSheet.create({
   phasePreviewArtImage: {
     width: ART_SIZE,
     height: ART_SIZE,
+  },
+  /** Full tile width: hex asset is margin-trimmed so honeycomb and diamond cover align under `cover`. */
+  tranceDualPlaneColumn: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: ART_SIZE,
+    height: ART_SIZE,
+    overflow: 'hidden',
+  },
+  tranceDualPlaneLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: ART_SIZE,
+  },
+  /** Hex plane shifted down by ⅓ tile height (clips at column edge). */
+  tranceHexOverlay: {
+    transform: [{ translateY: ART_SIZE / 3 }],
   },
   actionColumn: {
     flex: 1,
