@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -105,10 +106,29 @@ function GlimpsePhasesPreview() {
   return <GlimpseBlockGrid colors={colors} size={ART_SIZE} />;
 }
 
-function PlaceholderArt() {
+const STARE_DIAMOND_ART = require('../../assets/phase-stare-diamond.png');
+const TRANCE_HEXAGON_ART = require('../../assets/phase-trance-hexagon.png');
+
+/** Diamond lattice preview for The Stare (matches 5×10 diamond briefing). */
+function StarePhasePreview() {
   return (
-    <View style={[styles.artFrame, styles.placeholderArt]}>
-      <View style={styles.placeholderInner} />
+    <View
+      style={[styles.artFrame, styles.phasePreviewArtFrame]}
+      accessibilityRole="image"
+      accessibilityLabel="Cyan diamond pattern preview for The Stare phase">
+      <Image source={STARE_DIAMOND_ART} style={styles.phasePreviewArtImage} resizeMode="cover" />
+    </View>
+  );
+}
+
+/** Honeycomb hex preview for The Trance (dual-plane briefing). */
+function TrancePhasePreview() {
+  return (
+    <View
+      style={[styles.artFrame, styles.phasePreviewArtFrame]}
+      accessibilityRole="image"
+      accessibilityLabel="Hexagon honeycomb pattern preview for The Trance phase">
+      <Image source={TRANCE_HEXAGON_ART} style={styles.phasePreviewArtImage} resizeMode="cover" />
     </View>
   );
 }
@@ -211,7 +231,7 @@ export default function PhasesScreen() {
         <View style={styles.section}>
           <Text style={styles.levelTitle}>The Stare</Text>
           <View style={styles.row}>
-            <PlaceholderArt />
+            <StarePhasePreview />
             <View style={styles.actionColumn}>
               <View style={styles.actionRow}>
                 <Pressable
@@ -248,7 +268,7 @@ export default function PhasesScreen() {
         <View style={styles.section}>
           <Text style={styles.levelTitle}>The Trance</Text>
           <View style={styles.row}>
-            <PlaceholderArt />
+            <TrancePhasePreview />
             <View style={styles.actionColumn}>
               <View style={styles.actionRow}>
                 <Pressable
@@ -346,17 +366,14 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     overflow: 'hidden',
   },
-  placeholderArt: {
-    backgroundColor: '#FFFFFF',
+  phasePreviewArtFrame: {
+    backgroundColor: '#000000',
     borderWidth: 1,
     borderColor: 'rgba(136,136,136,0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  placeholderInner: {
-    width: '72%',
-    height: '72%',
-    backgroundColor: '#FAFAFA',
+  phasePreviewArtImage: {
+    width: ART_SIZE,
+    height: ART_SIZE,
   },
   actionColumn: {
     flex: 1,
