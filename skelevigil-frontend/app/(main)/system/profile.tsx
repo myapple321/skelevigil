@@ -1,12 +1,31 @@
 import { useNavigation, useRouter } from 'expo-router';
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { onAuthStateChanged, type User } from 'firebase/auth';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
 import { SV } from '@/src/theme/skelevigil';
 
 const PROFILE_STORAGE_KEY = 'skelevigil.profile.v1';
+
+const PROVIDER_LABEL: Record<string, string> = {
+  password: 'Email',
+  'apple.com': 'Apple',
+  'google.com': 'Google',
+};
+
+function signInMethodLabel(user: User | null): string {
+  if (!user) return '—';
+  if (user.isAnonymous) return 'Guest';
+  const names = user.providerData
+    .map((p) => PROVIDER_LABEL[p.providerId])
+    .filter((x): x is string => Boolean(x));
+  const unique = [...new Set(names)];
+  if (unique.length > 0) return unique.join(', ');
+  return 'Account';
+}
 
 export default function MyProfileScreen() {
   const navigation = useNavigation();
@@ -15,6 +34,14 @@ export default function MyProfileScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [authUser, setAuthUser] = useState<User | null>(() => getFirebaseAuth().currentUser);
+
+  const signInLine = useMemo(() => signInMethodLabel(authUser), [authUser]);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(getFirebaseAuth(), setAuthUser);
+    return unsub;
+  }, []);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -94,6 +121,13 @@ export default function MyProfileScreen() {
             editable={isEditing}
           />
         </View>
+
+        <View style={styles.group}>
+          <View style={styles.signInRow}>
+            <Text style={styles.signInLabel}>Sign-in method:</Text>
+            <Text style={styles.signInValue}>{signInLine}</Text>
+          </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -135,6 +169,22 @@ const styles = StyleSheet.create({
   },
   inputReadOnly: {
     opacity: 0.9,
+  },
+  signInRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 10,
+  },
+  signInLabel: {
+    color: SV.surgicalWhite,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  signInValue: {
+    color: SV.neonCyan,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
