@@ -208,16 +208,23 @@ export async function transactionRecordGlimpseSuccess(uid: string): Promise<{
   return { grantedFreeAttempt };
 }
 
-function nextProgressAfterGlimpseDebit(prev: VaultProgress): VaultProgress {
+function nextProgressAfterTierDebit(
+  prev: VaultProgress,
+  tier: keyof VaultAttemptsLeft,
+): VaultProgress {
   const attemptsLeft = {
     ...prev.attemptsLeft,
-    glimpse: Math.max(0, prev.attemptsLeft.glimpse - 1),
+    [tier]: Math.max(0, prev.attemptsLeft[tier] - 1),
   };
   return {
     ...prev,
     attemptsLeft,
     creditsTowardFreeMission: Math.max(0, FREE_MISSION_CREDIT_ALLOWANCE - prev.successfulMissions),
   };
+}
+
+function nextProgressAfterGlimpseDebit(prev: VaultProgress): VaultProgress {
+  return nextProgressAfterTierDebit(prev, 'glimpse');
 }
 
 export async function transactionRecordGlimpseFailure(uid: string): Promise<void> {
@@ -232,17 +239,25 @@ export async function transactionRecordGlimpseFailure(uid: string): Promise<void
   });
 }
 
-/** Spend one Glimpse reserve (e.g. New Mission) without recording a failed mission. */
-export async function transactionDeductGlimpseAttempt(uid: string): Promise<void> {
+/** Spend one reserve for the given phase tier (e.g. New Mission). */
+export async function transactionDeductAttempt(
+  uid: string,
+  tier: keyof VaultAttemptsLeft,
+): Promise<void> {
   const ref = vaultDocRef(uid);
   await runTransaction(getFirebaseFirestore(), async (tx) => {
     const snap = await tx.get(ref);
     const prev = snap.exists()
       ? progressFromDoc(snap.data() as Record<string, unknown>)
       : DEFAULT_VAULT_PROGRESS;
-    const next = nextProgressAfterGlimpseDebit(prev);
+    const next = nextProgressAfterTierDebit(prev, tier);
     tx.set(ref, toFirestorePayload(next), { merge: true });
   });
+}
+
+/** Spend one Glimpse reserve (e.g. New Mission) without recording a failed mission. */
+export async function transactionDeductGlimpseAttempt(uid: string): Promise<void> {
+  return transactionDeductAttempt(uid, 'glimpse');
 }
 
 export async function transactionDebugBuyThreeGlimpse(uid: string): Promise<void> {

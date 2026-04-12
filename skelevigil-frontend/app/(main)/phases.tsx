@@ -18,6 +18,7 @@ import {
   GLIMPSE_HELP_SUMMARY,
 } from '@/src/content/glimpsePhaseHelp';
 import { buildGlimpseGreyPalette } from '@/src/game/glimpsePalette';
+import { PHASE_ACCENTS } from '@/src/theme/phaseAccents';
 import { SV } from '@/src/theme/skelevigil';
 
 const BRIEFING_INTRO =
@@ -96,9 +97,9 @@ const ART_SIZE = 132;
 
 /** Phase CTA fills — distinct from the default neon cyan tab chrome. */
 const PHASE_BTN = {
-  glimpseGrey: '#8A8E91',
-  stareTeal: '#0E9595',
-  tranceLightOrange: '#F5BF8A',
+  glimpseGrey: PHASE_ACCENTS.glimpse.primary,
+  stareTeal: PHASE_ACCENTS.stare.primary,
+  tranceLightOrange: PHASE_ACCENTS.trance.primary,
 } as const;
 
 function GlimpsePhasesPreview() {
@@ -227,7 +228,7 @@ export default function PhasesScreen() {
                   />
                 </Pressable>
                 <Pressable
-                  onPress={() => router.push('/(main)/vigil')}
+                  onPress={() => router.push('/(main)/vigil?phase=glimpse')}
                   style={({ pressed }) => [
                     styles.playBtn,
                     styles.playBtnFlex,
@@ -264,7 +265,7 @@ export default function PhasesScreen() {
                   />
                 </Pressable>
                 <Pressable
-                  onPress={() => {}}
+                  onPress={() => router.push('/(main)/vigil?phase=stare')}
                   style={({ pressed }) => [
                     styles.playBtn,
                     styles.playBtnFlex,
@@ -301,7 +302,7 @@ export default function PhasesScreen() {
                   />
                 </Pressable>
                 <Pressable
-                  onPress={() => {}}
+                  onPress={() => router.push('/(main)/vigil?phase=trance')}
                   style={({ pressed }) => [
                     styles.playBtn,
                     styles.playBtnFlex,

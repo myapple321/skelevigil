@@ -1,6 +1,7 @@
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { useEffect, useRef } from 'react';
 
+import { PHASE_ACCENTS } from '@/src/theme/phaseAccents';
 import { SV } from '@/src/theme/skelevigil';
 
 import {
@@ -159,7 +160,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     overflow: 'hidden',
     borderWidth: 3,
-    borderColor: 'rgba(0,255,255,0.45)',
+    borderColor: PHASE_ACCENTS.glimpse.primary,
   },
   innerPad: {
     flex: 1,

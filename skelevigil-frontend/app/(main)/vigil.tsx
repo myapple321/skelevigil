@@ -1,5 +1,5 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
@@ -26,15 +26,13 @@ import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
 import { shuffledGlimpseGreyPalette } from '@/src/game/glimpsePalette';
 import { generateRandomNeuralBlocks, neuralBlockToTileIndex } from '@/src/game/neuralBlocks';
 import type { VaultAttemptsLeft } from '@/src/preferences/vaultProgress';
+import { parseVigilPhaseParam, PHASE_ACCENTS } from '@/src/theme/phaseAccents';
 import { SV } from '@/src/theme/skelevigil';
 
 const MEMORIZE_MS = 5000;
 const SCAN_MS = 2000;
 const PLAY_TIME_SEC = 25;
 const TIMEOUT_AMBER = '#FFBF00';
-
-/** Vigil currently implements The Glimpse only — reserves use the Glimpse tier. */
-const VIGIL_VAULT_PHASE: keyof VaultAttemptsLeft = 'glimpse';
 
 /**
  * Restored when the mission-success modal closes. Must include `display: 'flex'` so the bar
@@ -54,12 +52,19 @@ let vigilPausedAfterNextTabFocus = false;
 
 export default function VigilScreen() {
   const navigation = useNavigation();
+  const { phase: phaseParam } = useLocalSearchParams<{ phase?: string }>();
+  const vigilPhase = parseVigilPhaseParam(phaseParam);
+  const isGlimpse = vigilPhase === 'glimpse';
+  const accent = PHASE_ACCENTS[vigilPhase];
+  const vaultTier: keyof VaultAttemptsLeft =
+    vigilPhase === 'stare' ? 'stare' : vigilPhase === 'trance' ? 'trance' : 'glimpse';
+
   const { sfxEnabled } = useSfxPreference();
   const {
     progress,
     recordGlimpseFailure,
     recordGlimpseSuccess,
-    deductGlimpseAttempt,
+    deductVaultAttempt,
   } = useVaultProgress();
   const { width } = useWindowDimensions();
   const gridSize = Math.min(Math.max(width - 40, 220), 360);
@@ -86,6 +91,8 @@ export default function VigilScreen() {
    * until the round finishes (last credit was already spent on this sortie).
    */
   const [hasActiveRound, setHasActiveRound] = useState(false);
+  /** Stare / Trance placeholder: sortie open until Finish Excavation. */
+  const [placeholderRoundOpen, setPlaceholderRoundOpen] = useState(false);
   const [infoModal, setInfoModal] = useState<{ title: string; body: string } | null>(null);
 
   const missionSuccessOpenRef = useRef(missionSuccessModalVisible);
@@ -114,8 +121,9 @@ export default function VigilScreen() {
   const paidForCurrentRoundRef = useRef(false);
   timedOutRef.current = timedOut;
 
-  const glimpseReserves = progress.attemptsLeft[VIGIL_VAULT_PHASE];
-  const glimpseLocked = glimpseReserves <= 0 && !hasActiveRound;
+  const phaseReserves = progress.attemptsLeft[vaultTier];
+  const phaseLocked = phaseReserves <= 0 && !hasActiveRound;
+  const placeholderLocked = phaseReserves <= 0 && !placeholderRoundOpen;
 
   const neuralTileSetForUi = useMemo(
     () => new Set(neuralBlocks.map(neuralBlockToTileIndex)),
@@ -180,7 +188,11 @@ export default function VigilScreen() {
     useCallback(() => {
       if (vigilPausedAfterNextTabFocus) {
         vigilPausedAfterNextTabFocus = false;
-        if (!missionSuccessOpenRef.current && !awaitingWinStandbyRef.current) {
+        if (
+          isGlimpse &&
+          !missionSuccessOpenRef.current &&
+          !awaitingWinStandbyRef.current
+        ) {
           if (memorizeTickRef.current) {
             clearInterval(memorizeTickRef.current);
             memorizeTickRef.current = null;
@@ -200,8 +212,12 @@ export default function VigilScreen() {
       return () => {
         vigilPausedAfterNextTabFocus = true;
       };
-    }, []),
+    }, [isGlimpse]),
   );
+
+  useEffect(() => {
+    setPlaceholderRoundOpen(false);
+  }, [vigilPhase]);
 
   const commitMissionSuccess = () => {
     if (outcomeCommittedRef.current) return;
@@ -224,7 +240,8 @@ export default function VigilScreen() {
   };
 
   useEffect(() => {
-    if (glimpseLocked) {
+    if (!isGlimpse) return;
+    if (phaseLocked) {
       outcomeCommittedRef.current = false;
       setPhase('play');
       setMemorizeSecondsLeft(0);
@@ -260,10 +277,11 @@ export default function VigilScreen() {
       memorizeTickRef.current = null;
       memorizeDoneRef.current = null;
     };
-  }, [neuralBlocks, glimpseLocked, awaitingNewMissionAfterSuccess]);
+  }, [isGlimpse, neuralBlocks, phaseLocked, awaitingNewMissionAfterSuccess]);
 
   useEffect(() => {
-    if (glimpseLocked) return;
+    if (!isGlimpse) return;
+    if (phaseLocked) return;
     if (phase !== 'play') return;
     if (awaitingNewMissionAfterSuccess) return;
     if (failedIndex != null || timedOut) return;
@@ -284,32 +302,33 @@ export default function VigilScreen() {
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [phase, neuralBlocks, failedIndex, timedOut, glimpseLocked, awaitingNewMissionAfterSuccess]);
+  }, [isGlimpse, phase, neuralBlocks, failedIndex, timedOut, phaseLocked, awaitingNewMissionAfterSuccess]);
 
   useEffect(() => {
+    if (!isGlimpse) return;
     if (!timedOut) return;
     commitMissionFailure();
-  }, [timedOut]);
+  }, [isGlimpse, timedOut]);
 
   const onNewMission = () => {
     const skipDebit = lastRoundConsumedReserveRef.current;
-    if (glimpseReserves <= 0 && !skipDebit) {
+    if (phaseReserves <= 0 && !skipDebit) {
       setReservesEmptyModalVisible(true);
       return;
     }
-    // Before deduct: local `deductGlimpseAttempt` updates reserves synchronously; without this,
-    // one render can see 0 reserves and !hasActiveRound → glimpseLocked and the locked-branch effect.
+    // Before deduct: local vault deduct updates reserves synchronously; without this,
+    // one render can see 0 reserves and !hasActiveRound → phaseLocked and the locked-branch effect.
     setHasActiveRound(true);
     lastRoundConsumedReserveRef.current = false;
     if (!skipDebit) {
-      deductGlimpseAttempt();
+      deductVaultAttempt(vaultTier);
     }
     paidForCurrentRoundRef.current = !skipDebit;
     applyNewGridShuffle();
   };
 
   const onRevealCell = (index: number) => {
-    if (glimpseLocked) return;
+    if (phaseLocked) return;
     if (phase !== 'play') return;
     if (awaitingNewMissionAfterSuccess) return;
     if (failedIndex != null || timedOut) return;
@@ -343,7 +362,7 @@ export default function VigilScreen() {
   };
 
   const onFinishExcavation = () => {
-    if (glimpseLocked) return;
+    if (phaseLocked) return;
     if (phase !== 'play') return;
     if (awaitingNewMissionAfterSuccess) return;
     if (outcomeCommittedRef.current) return;
@@ -401,13 +420,38 @@ export default function VigilScreen() {
   };
 
   const finishDisabled =
-    glimpseLocked ||
+    phaseLocked ||
     phase !== 'play' ||
     awaitingNewMissionAfterSuccess ||
     failedIndex != null ||
     timedOut ||
     scanProgress != null ||
     !hasRevealedSafeTile;
+
+  const onPlaceholderNewMission = useCallback(() => {
+    if (placeholderLocked) {
+      setReservesEmptyModalVisible(true);
+      return;
+    }
+    deductVaultAttempt(vaultTier);
+    setPlaceholderRoundOpen(true);
+  }, [deductVaultAttempt, placeholderLocked, vaultTier]);
+
+  /**
+   * Stare/Trance placeholders: no success/failure vault sync yet. When real gameplay ships, wire
+   * Finish Excavation to the same outcomes as Glimpse — using `vaultTier` to call
+   * `recordGlimpseSuccess` / `recordGlimpseFailure` only after those APIs are generalized per phase
+   * (or add `recordStareSuccess` / `recordTranceSuccess` as needed).
+   */
+  const onPlaceholderFinishExcavation = useCallback(() => {
+    if (!placeholderRoundOpen) return;
+    setPlaceholderRoundOpen(false);
+  }, [placeholderRoundOpen]);
+
+  const placeholderFinishDisabled = !placeholderRoundOpen;
+
+  const reserveEmptyPhaseLabel =
+    vaultTier === 'trance' ? 'Trance' : vaultTier === 'stare' ? 'Stare' : 'Glimpse';
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -509,10 +553,15 @@ export default function VigilScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        <Text style={[styles.title, phase === 'play' && styles.titlePlaySpacing]}>The Glimpse</Text>
-        {glimpseLocked ? (
+        {isGlimpse ? (
+          <>
+        <Text
+          style={[styles.title, phase === 'play' && styles.titlePlaySpacing, { color: accent.primary }]}>
+          {accent.title}
+        </Text>
+        {phaseLocked ? (
           <Text style={styles.lockedHint} accessibilityLiveRegion="polite">
-            Glimpse attempts are depleted. Buy 3 Vault Credits to continue this mission.
+            {reserveEmptyPhaseLabel} attempts are depleted. Buy 3 Vault Credits to continue this mission.
           </Text>
         ) : phase === 'memorize' ? (
           <Text style={styles.memorizeHint} accessibilityLiveRegion="polite">
@@ -545,7 +594,11 @@ export default function VigilScreen() {
               <View
                 style={[
                   styles.excavationBarFill,
-                  { width: `${(playSecondsLeft / PLAY_TIME_SEC) * 100}%` },
+                  {
+                    width: `${(playSecondsLeft / PLAY_TIME_SEC) * 100}%`,
+                    backgroundColor: accent.primary,
+                    shadowColor: accent.primary,
+                  },
                 ]}
               />
             </View>
@@ -579,14 +632,22 @@ export default function VigilScreen() {
         <View style={styles.newGameRow}>
           <Pressable
             onPress={onOpenNewGameHelp}
-            style={({ pressed }) => [styles.newGameInfoBtn, pressed && styles.newGameInfoBtnPressed]}
+            style={({ pressed }) => [
+              styles.newGameInfoBtn,
+              { borderColor: accent.primary, backgroundColor: `${accent.primary}18` },
+              pressed && styles.newGameInfoBtnPressed,
+            ]}
             accessibilityRole="button"
             accessibilityLabel="New mission info">
-            <Text style={styles.newGameInfoText}>i</Text>
+            <Text style={[styles.newGameInfoText, { color: accent.primary }]}>i</Text>
           </Pressable>
           <Pressable
             onPress={onNewMission}
-            style={({ pressed }) => [styles.newGameBtn, pressed && styles.newGameBtnPressed]}
+            style={({ pressed }) => [
+              styles.newGameBtn,
+              { borderColor: accent.primary },
+              pressed && styles.newGameBtnPressed,
+            ]}
             accessibilityRole="button"
             accessibilityLabel="New mission, shuffle the grid">
             <Text style={styles.newGameBtnText}>New Mission</Text>
@@ -595,16 +656,25 @@ export default function VigilScreen() {
         <View style={styles.finishBottomRow}>
           <Pressable
             onPress={onOpenFinishHelp}
-            style={({ pressed }) => [styles.finishInfoBtn, pressed && styles.finishInfoBtnPressed]}
+            style={({ pressed }) => [
+              styles.finishInfoBtn,
+              { borderColor: accent.primary, backgroundColor: `${accent.primary}18` },
+              pressed && styles.finishInfoBtnPressed,
+            ]}
             accessibilityRole="button"
             accessibilityLabel="Finish excavation info">
-            <Text style={styles.finishInfoText}>i</Text>
+            <Text style={[styles.finishInfoText, { color: accent.primary }]}>i</Text>
           </Pressable>
           <Pressable
             onPress={onFinishExcavation}
             disabled={finishDisabled}
             style={({ pressed }) => [
               styles.finishBtn,
+              {
+                backgroundColor: accent.primary,
+                borderColor: accent.primary,
+                shadowColor: accent.primary,
+              },
               pressed && styles.finishBtnPressed,
               finishPulse && styles.finishBtnPulse,
               finishDisabled && styles.finishBtnDisabled,
@@ -614,6 +684,89 @@ export default function VigilScreen() {
             <Text style={styles.finishBtnText}>Finish Excavation</Text>
           </Pressable>
         </View>
+          </>
+        ) : (
+          <>
+            <Text style={[styles.title, { color: accent.primary }]}>{accent.title}</Text>
+            {placeholderLocked ? (
+              <Text style={styles.lockedHint} accessibilityLiveRegion="polite">
+                {reserveEmptyPhaseLabel} attempts are depleted. Visit the Vault to restore your
+                connection.
+              </Text>
+            ) : (
+              <Text style={styles.tabReturnHint} accessibilityLiveRegion="polite">
+                {placeholderRoundOpen
+                  ? 'Placeholder grid — excavation gameplay will connect here in a future update.'
+                  : 'Tap New Mission to begin a sortie. The 10×5 layout is a stand-in for the vertical excavation surface.'}
+              </Text>
+            )}
+            <View
+              style={[styles.placeholderVerticalBox, { borderColor: accent.primary }]}
+              accessibilityRole="none"
+              accessibilityLabel="Placeholder excavation grid, 10 by 5">
+              <Text style={styles.placeholderGridMeta}>10 × 5</Text>
+            </View>
+            <View style={styles.newGameRow}>
+              <Pressable
+                onPress={onOpenNewGameHelp}
+                style={({ pressed }) => [
+                  styles.newGameInfoBtn,
+                  { borderColor: accent.primary, backgroundColor: `${accent.primary}18` },
+                  pressed && styles.newGameInfoBtnPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="New mission info">
+                <Text style={[styles.newGameInfoText, { color: accent.primary }]}>i</Text>
+              </Pressable>
+              <Pressable
+                onPress={onPlaceholderNewMission}
+                style={({ pressed }) => [
+                  styles.newGameBtn,
+                  { borderColor: accent.primary },
+                  pressed && styles.newGameBtnPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="New mission">
+                <Text style={styles.newGameBtnText}>New Mission</Text>
+              </Pressable>
+            </View>
+            <View style={styles.finishBottomRow}>
+              <Pressable
+                onPress={onOpenFinishHelp}
+                style={({ pressed }) => [
+                  styles.finishInfoBtn,
+                  { borderColor: accent.primary, backgroundColor: `${accent.primary}18` },
+                  pressed && styles.finishInfoBtnPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Finish excavation info">
+                <Text style={[styles.finishInfoText, { color: accent.primary }]}>i</Text>
+              </Pressable>
+              <Pressable
+                onPress={onPlaceholderFinishExcavation}
+                disabled={placeholderFinishDisabled}
+                style={({ pressed }) => [
+                  styles.finishBtn,
+                  {
+                    backgroundColor: accent.primary,
+                    borderColor: accent.primary,
+                    shadowColor: accent.primary,
+                  },
+                  pressed && styles.finishBtnPressed,
+                  placeholderFinishDisabled && styles.finishBtnDisabled,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Finish Excavation">
+                <Text style={styles.finishBtnText}>Finish Excavation</Text>
+              </Pressable>
+            </View>
+            {vigilPhase === 'trance' ? (
+              <Text style={styles.trancePlaceholderNote}>
+                Dual-plane (two stacked layers) layout will replace this placeholder.
+              </Text>
+            ) : null}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -848,6 +1001,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     textAlign: 'center',
+  },
+  /** Stand-in frame: width∶height = 5∶10 (kept as the agreed layout). */
+  placeholderVerticalBox: {
+    alignSelf: 'center',
+    width: '52%',
+    maxWidth: 220,
+    aspectRatio: 5 / 10,
+    borderWidth: 3,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  placeholderGridMeta: {
+    color: SV.muted,
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  trancePlaceholderNote: {
+    color: SV.muted,
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 17,
+    marginTop: 14,
+    paddingHorizontal: 12,
+    maxWidth: 360,
   },
   modalBackdrop: {
     flex: 1,
