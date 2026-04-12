@@ -6,6 +6,12 @@ import { SV } from '@/src/theme/skelevigil';
 const ROWS = 10;
 const COLS = 5;
 
+/**
+ * Play box width/height. Was 5/10 (height = 2×width); a slightly larger ratio shortens the box
+ * so the border sits closer to the mesh with less empty band top/bottom (tune if mesh clips).
+ */
+const PLAY_BOX_ASPECT_RATIO = 5 / 9;
+
 /** Reference lattice: black gutters (hairlines) between bright cyan diamonds. */
 const FIELD_BLACK = '#121212';
 const DIAMOND_CYAN = SV.neonCyan;
@@ -138,7 +144,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: '96%',
     maxWidth: 312,
-    aspectRatio: 5 / 10,
+    aspectRatio: PLAY_BOX_ASPECT_RATIO,
     overflow: 'visible',
     zIndex: 0,
   },
@@ -152,8 +158,11 @@ const styles = StyleSheet.create({
     flex: 1,
     zIndex: 1,
     paddingLeft: '2.5%',
-    /** Room for stagger + near-max diamond without right-edge clip. */
-    paddingRight: '22%',
+    /**
+     * Inset for stagger (`translateX` on odd rows). Was ~22% and left a wide empty band at right;
+     * ~12% is usually enough vs 9% shift + rotated corners — raise if the 5th diamond clips.
+     */
+    paddingRight: '12%',
     paddingTop: 0,
     paddingBottom: 0,
     backgroundColor: 'transparent',
