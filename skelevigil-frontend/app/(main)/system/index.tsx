@@ -2,10 +2,11 @@ import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { FirebaseError } from 'firebase/app';
 import { router } from 'expo-router';
-import { deleteUser, signOut, type User } from 'firebase/auth';
+import { deleteUser, onAuthStateChanged, signOut, type User } from 'firebase/auth';
 import type { ComponentProps } from 'react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Modal,
   Platform,
   Pressable,
@@ -19,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useMissionAlert } from '@/src/contexts/MissionAlertContext';
 import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
+import { PurchaseAllocationModal } from '@/src/components/vault/PurchaseAllocationModal';
 import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
 import {
   debugScheduleMonthlyGiftInSeconds,
@@ -145,7 +147,25 @@ export default function SystemIndexScreen() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteNeedsRecentSignIn, setDeleteNeedsRecentSignIn] = useState(false);
-  const { debugBuyThreeVaultCredits } = useVaultProgress();
+  const { progress, grantThreeVaultCreditsToPhase } = useVaultProgress();
+  const [debugPurchaseAllocOpen, setDebugPurchaseAllocOpen] = useState(false);
+  const [systemUser, setSystemUser] = useState<User | null>(() => getFirebaseAuth().currentUser);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(getFirebaseAuth(), setSystemUser);
+    return unsub;
+  }, []);
+
+  const systemIsGuest = systemUser?.isAnonymous === true;
+
+  const goToLoginFromGuest = async () => {
+    try {
+      await signOut(getFirebaseAuth());
+      router.replace('/(auth)');
+    } catch {
+      Alert.alert('Sign out failed', 'Please try again.');
+    }
+  };
   const { missionAlertsEnabled, hydrated: missionAlertsHydrated } = useMissionAlert();
 
   const debugMissionAlertsReady = missionAlertsHydrated && missionAlertsEnabled;
@@ -216,6 +236,20 @@ export default function SystemIndexScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <PurchaseAllocationModal
+        visible={debugPurchaseAllocOpen}
+        onRequestClose={() => setDebugPurchaseAllocOpen(false)}
+        isGuest={systemIsGuest}
+        attemptsLeft={progress.attemptsLeft}
+        onLinkAccount={() => void goToLoginFromGuest()}
+        onSelectPhase={(tier) => {
+          setDebugPurchaseAllocOpen(false);
+          void runDebugAsync('buy', async () => {
+            await grantThreeVaultCreditsToPhase(tier);
+            Alert.alert('Vault Synchronized', 'Added 3 Mission Reserve credits to the selected phase.');
+          });
+        }}
+      />
       <Modal
         visible={deleteOpen}
         transparent
@@ -361,7 +395,7 @@ export default function SystemIndexScreen() {
             <View style={styles.debugDividerLine} />
           </View>
           <Pressable
-            onPress={() => void runDebugAsync('buy', () => debugBuyThreeVaultCredits())}
+            onPress={() => setDebugPurchaseAllocOpen(true)}
             accessibilityState={{ busy: debugActionBusy === 'buy' }}
             style={({ pressed }) => [
               styles.debugBuyBtn,

@@ -19,7 +19,7 @@ import {
   nextProgressAfterSuccess,
   seedVaultDocIfMissing,
   subscribeVaultProgress,
-  transactionDebugBuyThreeGlimpse,
+  transactionGrantThreeVaultCreditsForPhase,
   transactionDeductAttempt,
   transactionGrantMonthlyGiftRotation,
   transactionRecordGlimpseFailure,
@@ -60,7 +60,8 @@ type VaultProgressContextValue = {
   recordGlimpseFailure: () => void;
   deductGlimpseAttempt: () => void;
   deductVaultAttempt: (tier: keyof VaultAttemptsLeft) => void;
-  debugBuyThreeVaultCredits: () => Promise<void>;
+  /** Debug / future post-purchase: +3 reserves for the chosen phase (Firestore or local). */
+  grantThreeVaultCreditsToPhase: (tier: keyof VaultAttemptsLeft) => Promise<void>;
   claimMonthlyGiftNotificationReward: () => Promise<void>;
 };
 
@@ -207,24 +208,27 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
     [deductVaultAttempt],
   );
 
-  const debugBuyThreeVaultCredits = useCallback(async (): Promise<void> => {
-    if (firestoreUid) {
-      try {
-        await transactionDebugBuyThreeGlimpse(firestoreUid);
-      } catch (err) {
-        alertVaultFirestoreError(err, 'update');
+  const grantThreeVaultCreditsToPhase = useCallback(
+    async (tier: keyof VaultAttemptsLeft): Promise<void> => {
+      if (firestoreUid) {
+        try {
+          await transactionGrantThreeVaultCreditsForPhase(firestoreUid, tier);
+        } catch (err) {
+          alertVaultFirestoreError(err, 'update');
+        }
+        return;
       }
-      return;
-    }
 
-    updateLocalOnly((prev) => ({
-      ...prev,
-      attemptsLeft: {
-        ...prev.attemptsLeft,
-        glimpse: prev.attemptsLeft.glimpse + 3,
-      },
-    }));
-  }, [firestoreUid, updateLocalOnly]);
+      updateLocalOnly((prev) => ({
+        ...prev,
+        attemptsLeft: {
+          ...prev.attemptsLeft,
+          [tier]: prev.attemptsLeft[tier] + 3,
+        },
+      }));
+    },
+    [firestoreUid, updateLocalOnly],
+  );
 
   const claimMonthlyGiftNotificationReward = useCallback(async () => {
     const authUser = await resolveAuthUserForClaim();
@@ -294,7 +298,7 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
       recordGlimpseFailure,
       deductGlimpseAttempt,
       deductVaultAttempt,
-      debugBuyThreeVaultCredits,
+      grantThreeVaultCreditsToPhase,
       claimMonthlyGiftNotificationReward,
     }),
     [
@@ -304,7 +308,7 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
       recordGlimpseFailure,
       deductGlimpseAttempt,
       deductVaultAttempt,
-      debugBuyThreeVaultCredits,
+      grantThreeVaultCreditsToPhase,
       claimMonthlyGiftNotificationReward,
     ],
   );

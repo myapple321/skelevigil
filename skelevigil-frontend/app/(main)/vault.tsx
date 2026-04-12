@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  PurchaseAllocationModal,
+  type VaultPhaseTier,
+} from '@/src/components/vault/PurchaseAllocationModal';
 import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
 import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
 import { FREE_MISSION_CREDIT_ALLOWANCE } from '@/src/preferences/vaultProgress';
@@ -19,6 +23,7 @@ const PHASE_RESERVE_LABEL_COLOR = {
 export default function VaultScreen() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => getFirebaseAuth().currentUser);
   const { progress, hydrated } = useVaultProgress();
+  const [purchaseAllocationOpen, setPurchaseAllocationOpen] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(getFirebaseAuth(), (user) => setCurrentUser(user));
@@ -36,27 +41,33 @@ export default function VaultScreen() {
     }
   };
 
+  /**
+   * Purchase flow: open allocation modal first. After user picks a phase, call RevenueCat
+   * `Purchases.purchasePackage` (not wired yet). On IAP success, grant +3 to that phase in Firestore.
+   */
   const onBuyVaultCredits = () => {
-    if (isGuest) {
-      Alert.alert(
-        'Secure Your Account',
-        'To keep your purchases safe and available on all your devices, Guest accounts cannot buy credits. Please log in with Email, Apple, or Google to continue.',
-        [
-          {
-            text: 'Go to Login',
-            onPress: () => void goToLoginFromGuest(),
-          },
-          { text: 'Cancel', style: 'cancel' },
-        ],
-      );
-      return;
-    }
+    setPurchaseAllocationOpen(true);
+  };
 
-    Alert.alert('RevenueCat', 'This is a RevenueCat placeholder and will be added later.');
+  const onPurchaseAllocationSelectPhase = (tier: VaultPhaseTier) => {
+    setPurchaseAllocationOpen(false);
+    if (isGuest) return;
+    Alert.alert(
+      'RevenueCat',
+      `This is a RevenueCat placeholder and will be added later.\n\nSelected phase: ${tier}. Wire Purchases.purchasePackage here, then on success call grant +3 for this phase in Firestore.`,
+    );
   };
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <PurchaseAllocationModal
+        visible={purchaseAllocationOpen}
+        onRequestClose={() => setPurchaseAllocationOpen(false)}
+        isGuest={isGuest}
+        attemptsLeft={progress.attemptsLeft}
+        onLinkAccount={() => void goToLoginFromGuest()}
+        onSelectPhase={onPurchaseAllocationSelectPhase}
+      />
       <View style={styles.body}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Vault Scoreboard</Text>

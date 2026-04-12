@@ -260,7 +260,11 @@ export async function transactionDeductGlimpseAttempt(uid: string): Promise<void
   return transactionDeductAttempt(uid, 'glimpse');
 }
 
-export async function transactionDebugBuyThreeGlimpse(uid: string): Promise<void> {
+/** +3 Mission Reserves for one phase (debug / post-IAP success). */
+export async function transactionGrantThreeVaultCreditsForPhase(
+  uid: string,
+  tier: keyof VaultAttemptsLeft,
+): Promise<void> {
   const ref = vaultDocRef(uid);
   await runTransaction(getFirebaseFirestore(), async (tx) => {
     const snap = await tx.get(ref);
@@ -269,11 +273,15 @@ export async function transactionDebugBuyThreeGlimpse(uid: string): Promise<void
       : DEFAULT_VAULT_PROGRESS;
     const attemptsLeft = {
       ...prev.attemptsLeft,
-      glimpse: prev.attemptsLeft.glimpse + 3,
+      [tier]: prev.attemptsLeft[tier] + 3,
     };
     const next: VaultProgress = { ...prev, attemptsLeft };
     tx.set(ref, toFirestorePayload(next), { merge: true });
   });
+}
+
+export async function transactionDebugBuyThreeGlimpse(uid: string): Promise<void> {
+  return transactionGrantThreeVaultCreditsForPhase(uid, 'glimpse');
 }
 
 /** Monthly gift: pure rotational +1; persists giftRotationIndex. */
