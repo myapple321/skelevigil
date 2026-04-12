@@ -20,6 +20,7 @@ import {
 import { playTileFailSfx } from '@/src/audio/tileFailSfx';
 import { playTileRevealSfx } from '@/src/audio/tileRevealSfx';
 import { GlimpseRevealBoard } from '@/src/components/game/GlimpseRevealBoard';
+import { StareDiamondPlayBox } from '@/src/components/game/StareDiamondPlayBox';
 import { GLIMPSE_HELP_HINT, GLIMPSE_HELP_SUMMARY } from '@/src/content/glimpsePhaseHelp';
 import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
 import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
@@ -552,6 +553,7 @@ export default function VigilScreen() {
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
+        removeClippedSubviews={false}
         showsVerticalScrollIndicator={false}>
         {isGlimpse ? (
           <>
@@ -700,12 +702,16 @@ export default function VigilScreen() {
                   : 'Tap New Mission to begin a sortie. The 10×5 layout is a stand-in for the vertical excavation surface.'}
               </Text>
             )}
-            <View
-              style={[styles.placeholderVerticalBox, { borderColor: accent.primary }]}
-              accessibilityRole="none"
-              accessibilityLabel="Placeholder excavation grid, 10 by 5">
-              <Text style={styles.placeholderGridMeta}>10 × 5</Text>
-            </View>
+            {vigilPhase === 'stare' ? (
+              <StareDiamondPlayBox borderColor={accent.primary} />
+            ) : (
+              <View
+                style={[styles.placeholderVerticalBox, { borderColor: accent.primary }]}
+                accessibilityRole="none"
+                accessibilityLabel="Placeholder excavation grid, 10 by 5">
+                <Text style={styles.placeholderGridMeta}>10 × 5</Text>
+              </View>
+            )}
             <View style={styles.newGameRow}>
               <Pressable
                 onPress={onOpenNewGameHelp}
