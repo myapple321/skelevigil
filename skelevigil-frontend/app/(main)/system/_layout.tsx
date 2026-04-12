@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 
 import { SvHeaderBack } from '@/src/components/SvHeaderBack';
+import { PHASE_ACCENTS } from '@/src/theme/phaseAccents';
 import { SV } from '@/src/theme/skelevigil';
 
 export default function SystemLayout() {
@@ -9,7 +10,7 @@ export default function SystemLayout() {
       screenOptions={{
         headerStyle: { backgroundColor: SV.abyss },
         headerTintColor: SV.neonCyan,
-        headerTitleStyle: { color: SV.surgicalWhite, fontWeight: '600' },
+        headerTitleStyle: { color: PHASE_ACCENTS.stare.primary, fontWeight: '700' },
         contentStyle: { backgroundColor: SV.abyss },
       }}>
       <Stack.Screen name="index" options={{ title: 'System' }} />

@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { PHASE_ACCENTS } from '@/src/theme/phaseAccents';
 import { SV } from '@/src/theme/skelevigil';
 
 export default function MainLayout() {
@@ -10,7 +11,7 @@ export default function MainLayout() {
         headerShown: true,
         headerStyle: { backgroundColor: SV.abyss },
         headerTintColor: SV.neonCyan,
-        headerTitleStyle: { color: SV.surgicalWhite, fontWeight: '600' },
+        headerTitleStyle: { color: PHASE_ACCENTS.stare.primary, fontWeight: '700' },
         tabBarStyle: {
           backgroundColor: SV.abyss,
           borderTopColor: 'rgba(0,255,255,0.2)',
