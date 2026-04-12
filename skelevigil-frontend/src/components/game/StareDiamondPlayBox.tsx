@@ -40,6 +40,8 @@ const BETWEEN_PAIRS_ROW_OVERLAP_DP = 78;
  * If tips clip, lower to ~0.992 before touching stack/nudge.
  */
 const DIAMOND_SIDE_FIT = 0.997;
+/** Border-only vertical inset (visual frame hug). */
+const BORDER_VERTICAL_INSET_DP = 34;
 
 type Props = {
   /** Stare phase chrome (outer border). */
@@ -84,7 +86,7 @@ export function StareDiamondPlayBox({ borderColor }: Props) {
             diamondSidePx == null
               ? 0
               : (row % 2 === 0 ? 1 : -1) *
-                Math.min(VERT_NUDGE_DP, diamondSidePx * 0.55);
+                  Math.min(VERT_NUDGE_DP, diamondSidePx * 0.55);
           return (
             <View
               key={row}
@@ -149,7 +151,11 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
   playBoxFace: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: BORDER_VERTICAL_INSET_DP,
+    bottom: BORDER_VERTICAL_INSET_DP,
     borderWidth: 3,
     borderRadius: 10,
     backgroundColor: FIELD_BLACK,
