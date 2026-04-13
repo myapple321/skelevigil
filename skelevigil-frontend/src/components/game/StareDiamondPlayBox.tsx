@@ -15,6 +15,8 @@ const PLAY_BOX_ASPECT_RATIO = 5 / 9;
 /** Reference lattice: black gutters (hairlines) between bright cyan diamonds. */
 const FIELD_BLACK = '#121212';
 const DIAMOND_CYAN = SV.neonCyan;
+/** Neural strand cells — brighter than field diamonds for memorization contrast. */
+const NEURAL_DIAMOND = '#B8FFFF';
 /**
  * Half a column pitch for brick stagger. `translateX` draws past layout width — row stays
  * overflow:visible so the 5th diamond is not clipped.
@@ -46,13 +48,18 @@ const BORDER_VERTICAL_INSET_DP = 34;
 type Props = {
   /** Stare phase chrome (outer border). */
   borderColor: string;
+  /** Tile indices (0–49, row-major top→bottom) that belong to the neural strand. */
+  neuralTileIndices?: ReadonlySet<number>;
 };
 
 /**
  * 10 × 5 = 50 diamonds: stagger via translateX on odd indices (1-based rows 2,4,6,8,10).
  * Opaque cells + row overlap painted over stagger rows’ tips; cells stay transparent (mesh from face).
  */
-export function StareDiamondPlayBox({ borderColor }: Props) {
+export function StareDiamondPlayBox({
+  borderColor,
+  neuralTileIndices,
+}: Props) {
   const measuredRef = useRef(false);
   const [diamondSidePx, setDiamondSidePx] = useState<number | null>(null);
 
@@ -107,6 +114,7 @@ export function StareDiamondPlayBox({ borderColor }: Props) {
                 ]}>
                 {Array.from({ length: COLS }, (_, col) => {
                   const key = row * COLS + col;
+                  const isNeural = neuralTileIndices?.has(key) ?? false;
                   return (
                     <View key={key} style={styles.cell}>
                       <View style={styles.diamondWrap}>
@@ -117,6 +125,7 @@ export function StareDiamondPlayBox({ borderColor }: Props) {
                               {
                                 width: diamondSidePx,
                                 height: diamondSidePx,
+                                backgroundColor: isNeural ? NEURAL_DIAMOND : DIAMOND_CYAN,
                                 transform: [
                                   { translateY: nudgeY },
                                   { rotate: '45deg' },
@@ -203,7 +212,6 @@ const styles = StyleSheet.create({
     overflow: 'visible',
   },
   diamond: {
-    backgroundColor: DIAMOND_CYAN,
     borderRadius: 1,
   },
 });

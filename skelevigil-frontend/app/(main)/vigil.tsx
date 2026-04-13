@@ -20,19 +20,25 @@ import {
 import { playTileFailSfx } from '@/src/audio/tileFailSfx';
 import { playTileRevealSfx } from '@/src/audio/tileRevealSfx';
 import { GlimpseRevealBoard } from '@/src/components/game/GlimpseRevealBoard';
-import { StareDiamondPlayBox } from '@/src/components/game/StareDiamondPlayBox';
+import { StareRevealBoard } from '@/src/components/game/StareRevealBoard';
 import { GLIMPSE_HELP_HINT, GLIMPSE_HELP_SUMMARY } from '@/src/content/glimpsePhaseHelp';
 import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
 import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
-import { shuffledGlimpseGreyPalette } from '@/src/game/glimpsePalette';
+import { shuffledGlimpseGreyPalette, shuffledStareGreyPalette } from '@/src/game/glimpsePalette';
 import { generateRandomNeuralBlocks, neuralBlockToTileIndex } from '@/src/game/neuralBlocks';
+import {
+  generateRandomStareNeuralBlocks,
+  stareNeuralBlockToTileIndex,
+} from '@/src/game/stareNeuralBlocks';
 import type { VaultAttemptsLeft } from '@/src/preferences/vaultProgress';
 import { parseVigilPhaseParam, PHASE_ACCENTS } from '@/src/theme/phaseAccents';
 import { SV } from '@/src/theme/skelevigil';
 
 const MEMORIZE_MS = 5000;
 const SCAN_MS = 2000;
-const PLAY_TIME_SEC = 25;
+const GLIMPSE_PLAY_TIME_SEC = 25;
+/** Stare (5×10 diamond grid) mission clock — longer than Glimpse. */
+const STARE_PLAY_TIME_SEC = 50;
 const TIMEOUT_AMBER = '#FFBF00';
 
 /**
@@ -56,6 +62,8 @@ export default function VigilScreen() {
   const { phase: phaseParam } = useLocalSearchParams<{ phase?: string }>();
   const vigilPhase = parseVigilPhaseParam(phaseParam);
   const isGlimpse = vigilPhase === 'glimpse';
+  const isStare = vigilPhase === 'stare';
+  const isMissionGrid = isGlimpse || isStare;
   const accent = PHASE_ACCENTS[vigilPhase];
   const vaultTier: keyof VaultAttemptsLeft =
     vigilPhase === 'stare' ? 'stare' : vigilPhase === 'trance' ? 'trance' : 'glimpse';
@@ -63,8 +71,8 @@ export default function VigilScreen() {
   const { sfxEnabled } = useSfxPreference();
   const {
     progress,
-    recordGlimpseFailure,
     recordGlimpseSuccess,
+    recordMissionFailure,
     deductVaultAttempt,
   } = useVaultProgress();
   const { width } = useWindowDimensions();
@@ -74,12 +82,15 @@ export default function VigilScreen() {
   const cellGap = Math.max(2, Math.round(GLIMPSE_CELL_GAP * scale));
 
   const [neuralBlocks, setNeuralBlocks] = useState(() => generateRandomNeuralBlocks());
+  const [stareNeuralBlocks, setStareNeuralBlocks] = useState(() =>
+    generateRandomStareNeuralBlocks(),
+  );
   /** Start idle until the first New Mission (no auto-memorize on first land). */
   const [phase, setPhase] = useState<'memorize' | 'play' | 'paused'>('paused');
   const [memorizeSecondsLeft, setMemorizeSecondsLeft] = useState(5);
   const [failedIndex, setFailedIndex] = useState<number | null>(null);
   const [timedOut, setTimedOut] = useState(false);
-  const [playSecondsLeft, setPlaySecondsLeft] = useState(PLAY_TIME_SEC);
+  const [playSecondsLeft, setPlaySecondsLeft] = useState(GLIMPSE_PLAY_TIME_SEC);
   const [scanProgress, setScanProgress] = useState<number | null>(null);
   const [finishPulse, setFinishPulse] = useState(false);
   const [successPulseToken, setSuccessPulseToken] = useState(0);
@@ -102,11 +113,17 @@ export default function VigilScreen() {
   awaitingWinStandbyRef.current = awaitingNewMissionAfterSuccess;
 
   const [gridColors, setGridColors] = useState(() => shuffledGlimpseGreyPalette());
+  const [stareGridColors, setStareGridColors] = useState(() => shuffledStareGreyPalette());
   const [revealed, setRevealed] = useState<boolean[]>(() =>
     Array.from({ length: 25 }, () => false),
   );
+  const [stareRevealed, setStareRevealed] = useState<boolean[]>(() =>
+    Array.from({ length: 50 }, () => false),
+  );
   const revealedRef = useRef(revealed);
+  const stareRevealedRef = useRef(stareRevealed);
   revealedRef.current = revealed;
+  stareRevealedRef.current = stareRevealed;
   const finishScanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const memorizeTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const memorizeDoneRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -118,7 +135,7 @@ export default function VigilScreen() {
   const outcomeCommittedRef = useRef(false);
   /** After a failed round, the next New Mission does not debit again (failure already consumed a reserve). */
   const lastRoundConsumedReserveRef = useRef(false);
-  /** This grid was paid for via New Mission debit; failure should not also call recordGlimpseFailure. */
+  /** This grid was paid for via New Mission debit; failure should not also call recordMissionFailure. */
   const paidForCurrentRoundRef = useRef(false);
   timedOutRef.current = timedOut;
 
@@ -130,12 +147,21 @@ export default function VigilScreen() {
     () => new Set(neuralBlocks.map(neuralBlockToTileIndex)),
     [neuralBlocks],
   );
-  const hasRevealedSafeTile = useMemo(
-    () => revealed.some((isRev, idx) => isRev && !neuralTileSetForUi.has(idx)),
-    [revealed, neuralTileSetForUi],
+  const stareNeuralTileSet = useMemo(
+    () => new Set(stareNeuralBlocks.map(stareNeuralBlockToTileIndex)),
+    [stareNeuralBlocks],
   );
+  const hasRevealedSafeTile = useMemo(() => {
+    if (isGlimpse) {
+      return revealed.some((isRev, idx) => isRev && !neuralTileSetForUi.has(idx));
+    }
+    if (isStare) {
+      return stareRevealed.some((isRev, idx) => isRev && !stareNeuralTileSet.has(idx));
+    }
+    return false;
+  }, [isGlimpse, isStare, revealed, stareRevealed, neuralTileSetForUi, stareNeuralTileSet]);
 
-  const applyNewGridShuffle = useCallback(() => {
+  const applyGlimpseShuffle = useCallback(() => {
     outcomeCommittedRef.current = false;
     setPhase('memorize');
     setMemorizeSecondsLeft(5);
@@ -154,6 +180,27 @@ export default function VigilScreen() {
     const fresh = Array.from({ length: 25 }, () => false);
     revealedRef.current = fresh;
     setRevealed(fresh);
+  }, []);
+
+  const applyStareShuffle = useCallback(() => {
+    outcomeCommittedRef.current = false;
+    setPhase('memorize');
+    setMemorizeSecondsLeft(5);
+    setStareNeuralBlocks(generateRandomStareNeuralBlocks());
+    setStareGridColors(shuffledStareGreyPalette());
+    setFailedIndex(null);
+    setTimedOut(false);
+    setScanProgress(null);
+    if (finishScanTimerRef.current) {
+      clearInterval(finishScanTimerRef.current);
+      finishScanTimerRef.current = null;
+    }
+    setFinishPulse(false);
+    setAwaitingNewMissionAfterSuccess(false);
+    hasBegunSortieRef.current = true;
+    const fresh = Array.from({ length: 50 }, () => false);
+    stareRevealedRef.current = fresh;
+    setStareRevealed(fresh);
   }, []);
 
   const onDismissMissionSuccess = useCallback(() => {
@@ -190,7 +237,7 @@ export default function VigilScreen() {
       if (vigilPausedAfterNextTabFocus) {
         vigilPausedAfterNextTabFocus = false;
         if (
-          isGlimpse &&
+          (isGlimpse || isStare) &&
           !missionSuccessOpenRef.current &&
           !awaitingWinStandbyRef.current
         ) {
@@ -213,7 +260,7 @@ export default function VigilScreen() {
       return () => {
         vigilPausedAfterNextTabFocus = true;
       };
-    }, [isGlimpse]),
+    }, [isGlimpse, isStare]),
   );
 
   useEffect(() => {
@@ -236,19 +283,21 @@ export default function VigilScreen() {
     if (paidForCurrentRoundRef.current) {
       paidForCurrentRoundRef.current = false;
     } else {
-      recordGlimpseFailure();
+      recordMissionFailure(vaultTier);
     }
   };
 
   useEffect(() => {
-    if (!isGlimpse) return;
+    if (!isMissionGrid) return;
     if (phaseLocked) {
       outcomeCommittedRef.current = false;
       setPhase('play');
       setMemorizeSecondsLeft(0);
       setFailedIndex(null);
       setTimedOut(false);
-      setPlaySecondsLeft(PLAY_TIME_SEC);
+      setPlaySecondsLeft(
+        vigilPhase === 'stare' ? STARE_PLAY_TIME_SEC : GLIMPSE_PLAY_TIME_SEC,
+      );
       return;
     }
     // Do not depend on `phase` here: when memorize ends and sets phase to 'play', re-running would
@@ -270,6 +319,9 @@ export default function VigilScreen() {
       memorizeTickRef.current = null;
       memorizeDoneRef.current = null;
       setPhase('play');
+      setPlaySecondsLeft(
+        vigilPhase === 'stare' ? STARE_PLAY_TIME_SEC : GLIMPSE_PLAY_TIME_SEC,
+      );
     }, MEMORIZE_MS);
     memorizeDoneRef.current = done;
     return () => {
@@ -278,16 +330,24 @@ export default function VigilScreen() {
       memorizeTickRef.current = null;
       memorizeDoneRef.current = null;
     };
-  }, [isGlimpse, neuralBlocks, phaseLocked, awaitingNewMissionAfterSuccess]);
+  }, [
+    isMissionGrid,
+    vigilPhase,
+    neuralBlocks,
+    stareNeuralBlocks,
+    phaseLocked,
+    awaitingNewMissionAfterSuccess,
+  ]);
 
   useEffect(() => {
-    if (!isGlimpse) return;
+    if (!isMissionGrid) return;
     if (phaseLocked) return;
     if (phase !== 'play') return;
     if (awaitingNewMissionAfterSuccess) return;
     if (failedIndex != null || timedOut) return;
 
-    setPlaySecondsLeft(PLAY_TIME_SEC);
+    const cap = vigilPhase === 'stare' ? STARE_PLAY_TIME_SEC : GLIMPSE_PLAY_TIME_SEC;
+    setPlaySecondsLeft(cap);
     const id = setInterval(() => {
       setPlaySecondsLeft((s) => {
         if (s <= 1) {
@@ -303,13 +363,23 @@ export default function VigilScreen() {
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [isGlimpse, phase, neuralBlocks, failedIndex, timedOut, phaseLocked, awaitingNewMissionAfterSuccess]);
+  }, [
+    isMissionGrid,
+    vigilPhase,
+    phase,
+    neuralBlocks,
+    stareNeuralBlocks,
+    failedIndex,
+    timedOut,
+    phaseLocked,
+    awaitingNewMissionAfterSuccess,
+  ]);
 
   useEffect(() => {
-    if (!isGlimpse) return;
+    if (!isMissionGrid) return;
     if (!timedOut) return;
     commitMissionFailure();
-  }, [isGlimpse, timedOut]);
+  }, [isMissionGrid, timedOut]);
 
   const onNewMission = () => {
     const skipDebit = lastRoundConsumedReserveRef.current;
@@ -325,7 +395,8 @@ export default function VigilScreen() {
       deductVaultAttempt(vaultTier);
     }
     paidForCurrentRoundRef.current = !skipDebit;
-    applyNewGridShuffle();
+    if (isGlimpse) applyGlimpseShuffle();
+    else if (isStare) applyStareShuffle();
   };
 
   const onRevealCell = (index: number) => {
@@ -333,25 +404,46 @@ export default function VigilScreen() {
     if (phase !== 'play') return;
     if (awaitingNewMissionAfterSuccess) return;
     if (failedIndex != null || timedOut) return;
-    if (revealedRef.current[index]) return;
 
-    const neuralTileSet = new Set(neuralBlocks.map(neuralBlockToTileIndex));
-    if (neuralTileSet.has(index)) {
-      setFailedIndex(index);
-      setTimedOut(false);
-      commitMissionFailure();
-      if (sfxEnabled) void playTileFailSfx();
+    if (isGlimpse) {
+      if (revealedRef.current[index]) return;
+      const neuralTileSet = new Set(neuralBlocks.map(neuralBlockToTileIndex));
+      if (neuralTileSet.has(index)) {
+        setFailedIndex(index);
+        setTimedOut(false);
+        commitMissionFailure();
+        if (sfxEnabled) void playTileFailSfx();
+        return;
+      }
+      if (sfxEnabled) void playTileRevealSfx();
+      setRevealed((prev) => {
+        if (prev[index]) return prev;
+        const next = [...prev];
+        next[index] = true;
+        revealedRef.current = next;
+        return next;
+      });
       return;
     }
 
-    if (sfxEnabled) void playTileRevealSfx();
-    setRevealed((prev) => {
-      if (prev[index]) return prev;
-      const next = [...prev];
-      next[index] = true;
-      revealedRef.current = next;
-      return next;
-    });
+    if (isStare) {
+      if (stareRevealedRef.current[index]) return;
+      if (stareNeuralTileSet.has(index)) {
+        setFailedIndex(index);
+        setTimedOut(false);
+        commitMissionFailure();
+        if (sfxEnabled) void playTileFailSfx();
+        return;
+      }
+      if (sfxEnabled) void playTileRevealSfx();
+      setStareRevealed((prev) => {
+        if (prev[index]) return prev;
+        const next = [...prev];
+        next[index] = true;
+        stareRevealedRef.current = next;
+        return next;
+      });
+    }
   };
 
   const onOpenFinishHelp = () => {
@@ -363,6 +455,7 @@ export default function VigilScreen() {
   };
 
   const onFinishExcavation = () => {
+    if (!isMissionGrid) return;
     if (phaseLocked) return;
     if (phase !== 'play') return;
     if (awaitingNewMissionAfterSuccess) return;
@@ -374,7 +467,11 @@ export default function VigilScreen() {
     setFinishPulse(true);
     setTimeout(() => setFinishPulse(false), 220);
 
-    const neuralTileSet = new Set(neuralBlocks.map(neuralBlockToTileIndex));
+    const neuralTileSet = isGlimpse
+      ? new Set(neuralBlocks.map(neuralBlockToTileIndex))
+      : stareNeuralTileSet;
+    const gridLen = isGlimpse ? 25 : 50;
+
     setScanProgress(0);
     const startedAt = Date.now();
     const timer = setInterval(() => {
@@ -386,7 +483,7 @@ export default function VigilScreen() {
         finishScanTimerRef.current = null;
         setScanProgress(null);
 
-        const current = revealedRef.current;
+        const current = isGlimpse ? revealedRef.current : stareRevealedRef.current;
         const safeTilesAllRevealed = current.every((isRevealed, idx) =>
           neuralTileSet.has(idx) ? true : isRevealed,
         );
@@ -401,16 +498,27 @@ export default function VigilScreen() {
 
         if (success) {
           commitMissionSuccess();
-          const fullyRevealed = Array.from({ length: 25 }, () => true);
-          revealedRef.current = fullyRevealed;
-          setRevealed(fullyRevealed);
+          const fullyRevealed = Array.from({ length: gridLen }, () => true);
+          if (isGlimpse) {
+            revealedRef.current = fullyRevealed;
+            setRevealed(fullyRevealed);
+          } else {
+            stareRevealedRef.current = fullyRevealed;
+            setStareRevealed(fullyRevealed);
+          }
           setSuccessPulseToken((n) => n + 1);
           setAwaitingNewMissionAfterSuccess(true);
           setMissionSuccessModalVisible(true);
           return;
         }
 
-        const firstNeuralIdx = neuralBlocks.length > 0 ? neuralBlockToTileIndex(neuralBlocks[0]!) : 0;
+        const firstNeuralIdx = isGlimpse
+          ? neuralBlocks.length > 0
+            ? neuralBlockToTileIndex(neuralBlocks[0]!)
+            : 0
+          : stareNeuralBlocks.length > 0
+            ? stareNeuralBlockToTileIndex(stareNeuralBlocks[0]!)
+            : 0;
         setFailedIndex(firstNeuralIdx);
         setTimedOut(false);
         commitMissionFailure();
@@ -438,12 +546,6 @@ export default function VigilScreen() {
     setPlaceholderRoundOpen(true);
   }, [deductVaultAttempt, placeholderLocked, vaultTier]);
 
-  /**
-   * Stare/Trance placeholders: no success/failure vault sync yet. When real gameplay ships, wire
-   * Finish Excavation to the same outcomes as Glimpse — using `vaultTier` to call
-   * `recordGlimpseSuccess` / `recordGlimpseFailure` only after those APIs are generalized per phase
-   * (or add `recordStareSuccess` / `recordTranceSuccess` as needed).
-   */
   const onPlaceholderFinishExcavation = useCallback(() => {
     if (!placeholderRoundOpen) return;
     setPlaceholderRoundOpen(false);
@@ -453,6 +555,9 @@ export default function VigilScreen() {
 
   const reserveEmptyPhaseLabel =
     vaultTier === 'trance' ? 'Trance' : vaultTier === 'stare' ? 'Stare' : 'Glimpse';
+
+  const missionPlayTimeSec =
+    vigilPhase === 'stare' ? STARE_PLAY_TIME_SEC : GLIMPSE_PLAY_TIME_SEC;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -555,7 +660,7 @@ export default function VigilScreen() {
         contentContainerStyle={styles.scrollContent}
         removeClippedSubviews={false}
         showsVerticalScrollIndicator={false}>
-        {isGlimpse ? (
+        {isMissionGrid ? (
           <>
         <Text
           style={[styles.title, phase === 'play' && styles.titlePlaySpacing, { color: accent.primary }]}>
@@ -567,7 +672,9 @@ export default function VigilScreen() {
           </Text>
         ) : phase === 'memorize' ? (
           <Text style={styles.memorizeHint} accessibilityLiveRegion="polite">
-            Memorize the neural blocks. Tiles return in {memorizeSecondsLeft}s.
+            {isStare
+              ? `Memorize the neural strand. Covers return in ${memorizeSecondsLeft}s — then you have ${STARE_PLAY_TIME_SEC}s to excavate.`
+              : `Memorize the neural blocks. Tiles return in ${memorizeSecondsLeft}s.`}
           </Text>
         ) : phase === 'paused' ? (
           <Text style={styles.tabReturnHint} accessibilityLiveRegion="polite">
@@ -597,39 +704,66 @@ export default function VigilScreen() {
                 style={[
                   styles.excavationBarFill,
                   {
-                    width: `${(playSecondsLeft / PLAY_TIME_SEC) * 100}%`,
+                    width: `${(playSecondsLeft / missionPlayTimeSec) * 100}%`,
                     backgroundColor: accent.primary,
                     shadowColor: accent.primary,
                   },
                 ]}
               />
             </View>
+            <Text style={[styles.excavationTimeCaption, { color: accent.primary }]}>
+              {playSecondsLeft}s / {missionPlayTimeSec}s
+            </Text>
           </View>
         ) : null}
         <View style={styles.gridWrap}>
-          <GlimpseRevealBoard
-            colors={gridColors}
-            neuralBlocks={neuralBlocks}
-            showTiles={phase === 'play'}
-            failedIndex={failedIndex}
-            timedOut={timedOut}
-            excavationPressureFraction={
-              phase === 'play' &&
-              failedIndex == null &&
-              !awaitingNewMissionAfterSuccess
-                ? timedOut
-                  ? 1
-                  : (PLAY_TIME_SEC - playSecondsLeft) / PLAY_TIME_SEC
-                : null
-            }
-            scanProgress={scanProgress}
-            successPulseToken={successPulseToken}
-            size={gridSize}
-            matPadding={matPadding}
-            cellGap={cellGap}
-            revealed={revealed}
-            onRevealCell={onRevealCell}
-          />
+          {isGlimpse ? (
+            <GlimpseRevealBoard
+              colors={gridColors}
+              neuralBlocks={neuralBlocks}
+              showTiles={phase === 'play'}
+              failedIndex={failedIndex}
+              timedOut={timedOut}
+              excavationPressureFraction={
+                phase === 'play' &&
+                failedIndex == null &&
+                !awaitingNewMissionAfterSuccess
+                  ? timedOut
+                    ? 1
+                    : (missionPlayTimeSec - playSecondsLeft) / missionPlayTimeSec
+                  : null
+              }
+              scanProgress={scanProgress}
+              successPulseToken={successPulseToken}
+              size={gridSize}
+              matPadding={matPadding}
+              cellGap={cellGap}
+              revealed={revealed}
+              onRevealCell={onRevealCell}
+            />
+          ) : (
+            <StareRevealBoard
+              borderColor={accent.primary}
+              neuralTileIndices={stareNeuralTileSet}
+              colors={stareGridColors}
+              showTiles={phase === 'play'}
+              failedIndex={failedIndex}
+              timedOut={timedOut}
+              excavationPressureFraction={
+                phase === 'play' &&
+                failedIndex == null &&
+                !awaitingNewMissionAfterSuccess
+                  ? timedOut
+                    ? 1
+                    : (missionPlayTimeSec - playSecondsLeft) / missionPlayTimeSec
+                  : null
+              }
+              scanProgress={scanProgress}
+              successPulseToken={successPulseToken}
+              revealed={stareRevealed}
+              onRevealCell={onRevealCell}
+            />
+          )}
         </View>
         <View style={styles.newGameRow}>
           <Pressable
@@ -702,16 +836,12 @@ export default function VigilScreen() {
                   : 'Tap New Mission to begin a sortie. The 10×5 layout is a stand-in for the vertical excavation surface.'}
               </Text>
             )}
-            {vigilPhase === 'stare' ? (
-              <StareDiamondPlayBox borderColor={accent.primary} />
-            ) : (
-              <View
-                style={[styles.placeholderVerticalBox, { borderColor: accent.primary }]}
-                accessibilityRole="none"
-                accessibilityLabel="Placeholder excavation grid, 10 by 5">
-                <Text style={styles.placeholderGridMeta}>10 × 5</Text>
-              </View>
-            )}
+            <View
+              style={[styles.placeholderVerticalBox, { borderColor: accent.primary }]}
+              accessibilityRole="none"
+              accessibilityLabel="Placeholder excavation grid, 10 by 5">
+              <Text style={styles.placeholderGridMeta}>10 × 5</Text>
+            </View>
             <View style={styles.newGameRow}>
               <Pressable
                 onPress={onOpenNewGameHelp}
@@ -846,6 +976,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     marginBottom: 16,
     alignSelf: 'center',
+  },
+  excavationTimeCaption: {
+    marginTop: 6,
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: 0.5,
   },
   excavationBarTrack: {
     width: '100%',

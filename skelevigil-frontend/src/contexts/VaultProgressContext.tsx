@@ -22,7 +22,7 @@ import {
   transactionGrantThreeVaultCreditsForPhase,
   transactionDeductAttempt,
   transactionGrantMonthlyGiftRotation,
-  transactionRecordGlimpseFailure,
+  transactionRecordMissionFailure,
   transactionRecordGlimpseSuccess,
 } from '@/src/firebase/vaultProgressFirestore';
 import { rescheduleMonthlyGiftFromNow } from '@/src/notifications/missionNotificationsController';
@@ -58,6 +58,7 @@ type VaultProgressContextValue = {
   hydrated: boolean;
   recordGlimpseSuccess: () => void;
   recordGlimpseFailure: () => void;
+  recordMissionFailure: (tier: keyof VaultAttemptsLeft) => void;
   deductGlimpseAttempt: () => void;
   deductVaultAttempt: (tier: keyof VaultAttemptsLeft) => void;
   /** Debug / future post-purchase: +3 reserves for the chosen phase (Firestore or local). */
@@ -158,26 +159,34 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
     });
   }, [firestoreUid]);
 
-  const recordGlimpseFailure = useCallback(() => {
-    if (firestoreUid) {
-      void (async () => {
-        try {
-          await transactionRecordGlimpseFailure(firestoreUid);
-        } catch (err) {
-          alertVaultFirestoreError(err, 'save');
-        }
-      })();
-      return;
-    }
+  const recordMissionFailure = useCallback(
+    (tier: keyof VaultAttemptsLeft) => {
+      if (firestoreUid) {
+        void (async () => {
+          try {
+            await transactionRecordMissionFailure(firestoreUid, tier);
+          } catch (err) {
+            alertVaultFirestoreError(err, 'save');
+          }
+        })();
+        return;
+      }
 
-    updateLocalOnly((prev) => ({
-      ...prev,
-      attemptsLeft: {
-        ...prev.attemptsLeft,
-        glimpse: Math.max(0, prev.attemptsLeft.glimpse - 1),
-      },
-    }));
-  }, [firestoreUid, updateLocalOnly]);
+      updateLocalOnly((prev) => ({
+        ...prev,
+        attemptsLeft: {
+          ...prev.attemptsLeft,
+          [tier]: Math.max(0, prev.attemptsLeft[tier] - 1),
+        },
+      }));
+    },
+    [firestoreUid, updateLocalOnly],
+  );
+
+  const recordGlimpseFailure = useCallback(
+    () => recordMissionFailure('glimpse'),
+    [recordMissionFailure],
+  );
 
   const deductVaultAttempt = useCallback(
     (tier: keyof VaultAttemptsLeft) => {
@@ -296,6 +305,7 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
       hydrated,
       recordGlimpseSuccess,
       recordGlimpseFailure,
+      recordMissionFailure,
       deductGlimpseAttempt,
       deductVaultAttempt,
       grantThreeVaultCreditsToPhase,
@@ -306,6 +316,7 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
       hydrated,
       recordGlimpseSuccess,
       recordGlimpseFailure,
+      recordMissionFailure,
       deductGlimpseAttempt,
       deductVaultAttempt,
       grantThreeVaultCreditsToPhase,

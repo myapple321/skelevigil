@@ -223,20 +223,24 @@ function nextProgressAfterTierDebit(
   };
 }
 
-function nextProgressAfterGlimpseDebit(prev: VaultProgress): VaultProgress {
-  return nextProgressAfterTierDebit(prev, 'glimpse');
-}
-
-export async function transactionRecordGlimpseFailure(uid: string): Promise<void> {
+export async function transactionRecordMissionFailure(
+  uid: string,
+  tier: keyof VaultAttemptsLeft,
+): Promise<void> {
   const ref = vaultDocRef(uid);
   await runTransaction(getFirebaseFirestore(), async (tx) => {
     const snap = await tx.get(ref);
     const prev = snap.exists()
       ? progressFromDoc(snap.data() as Record<string, unknown>)
       : DEFAULT_VAULT_PROGRESS;
-    const next = nextProgressAfterGlimpseDebit(prev);
+    const next = nextProgressAfterTierDebit(prev, tier);
     tx.set(ref, toFirestorePayload(next), { merge: true });
   });
+}
+
+/** @deprecated Prefer {@link transactionRecordMissionFailure} with explicit tier. */
+export async function transactionRecordGlimpseFailure(uid: string): Promise<void> {
+  return transactionRecordMissionFailure(uid, 'glimpse');
 }
 
 /** Spend one reserve for the given phase tier (e.g. New Mission). */
