@@ -16,7 +16,7 @@ const PLAY_BOX_ASPECT_RATIO = 5 / 9;
 const FIELD_BLACK = '#121212';
 const DIAMOND_CYAN = SV.neonCyan;
 /** Neural strand cells — brighter than field diamonds for memorization contrast. */
-const NEURAL_DIAMOND = '#B8FFFF';
+const NEURAL_STRAND_BORDER_ICY = '#B8FFFF';
 /**
  * Half a column pitch for brick stagger. `translateX` draws past layout width — row stays
  * overflow:visible so the 5th diamond is not clipped.
@@ -122,10 +122,10 @@ export function StareDiamondPlayBox({
                           <View
                             style={[
                               styles.diamond,
+                              isNeural ? styles.diamondNeuralStrand : styles.diamondField,
                               {
                                 width: diamondSidePx,
                                 height: diamondSidePx,
-                                backgroundColor: isNeural ? NEURAL_DIAMOND : DIAMOND_CYAN,
                                 transform: [
                                   { translateY: nudgeY },
                                   { rotate: '45deg' },
@@ -213,5 +213,14 @@ const styles = StyleSheet.create({
   },
   diamond: {
     borderRadius: 1,
+    overflow: 'hidden',
+  },
+  diamondField: {
+    backgroundColor: DIAMOND_CYAN,
+  },
+  diamondNeuralStrand: {
+    backgroundColor: 'rgba(184,255,255,0.14)',
+    borderWidth: 3,
+    borderColor: NEURAL_STRAND_BORDER_ICY,
   },
 });

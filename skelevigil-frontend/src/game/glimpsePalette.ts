@@ -25,17 +25,19 @@ export function shuffledGlimpseGreyPalette(): string[] {
   return palette;
 }
 
-const STARE_GREY_LIGHT = 244;
-const STARE_GREY_DARK = 62;
-
-/** 50 greys (light → dark), one per Stare diamond cell. */
+/**
+ * Stare excavation covers: teal-tinted ramp (not neutral grey) so the play surface matches
+ * The Stare / diamond chrome; still 50 distinguishable shades after shuffle.
+ */
 export function buildStareGreyPalette(): string[] {
-  const light = STARE_GREY_LIGHT;
-  const dark = STARE_GREY_DARK;
+  const light = { r: 175, g: 245, b: 245 };
+  const dark = { r: 18, g: 58, b: 62 };
   return Array.from({ length: 50 }, (_, i) => {
     const t = i / 49;
-    const v = Math.round(light + (dark - light) * t);
-    return `rgb(${v},${v},${v})`;
+    const r = Math.round(light.r + (dark.r - light.r) * t);
+    const g = Math.round(light.g + (dark.g - light.g) * t);
+    const b = Math.round(light.b + (dark.b - light.b) * t);
+    return `rgb(${r},${g},${b})`;
   });
 }
 

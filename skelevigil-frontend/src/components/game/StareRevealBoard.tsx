@@ -10,8 +10,7 @@ const PLAY_BOX_ASPECT_RATIO = 5 / 9;
 const FIELD_BLACK = '#121212';
 /** Non-neural lattice fill (teal) — full grid only during play; hidden in memorize so the strand stands out. */
 const DIAMOND_CYAN = SV.neonCyan;
-/** Neural strand cells — lighter than field so the path reads as the “bright” shape to memorize. */
-const NEURAL_DIAMOND = '#B8FFFF';
+const NEURAL_STRAND_BORDER_ICY = '#B8FFFF';
 const STAGGER_SHIFT = '9%';
 const VERT_NUDGE_DP = 38;
 const ROW_STACK_DP = 44;
@@ -36,7 +35,8 @@ type Props = {
 };
 
 /**
- * Stare: 10×5 diamond lattice with grey cover tiles (same interaction model as Glimpse).
+ * Stare: 10×5 diamond lattice with teal-tinted cover tiles over the lattice (play phase).
+ * Covers are opaque excavation tiles — teal tint keeps phase color when tiles are on.
  */
 export function StareRevealBoard({
   borderColor,
@@ -123,17 +123,17 @@ export function StareRevealBoard({
                             <View
                               style={[
                                 styles.diamond,
+                                isNeural ? styles.diamondNeuralStrand : styles.diamondField,
                                 {
                                   width: diamondSidePx,
                                   height: diamondSidePx,
-                                  backgroundColor: isNeural ? NEURAL_DIAMOND : DIAMOND_CYAN,
                                   transform: [{ translateY: nudgeY }, { rotate: '45deg' }],
                                 },
                               ]}>
                               {isNeural ? (
                                 <Animated.View
                                   pointerEvents="none"
-                                  style={[styles.neuralPulseFill, heartbeatAnim]}
+                                  style={[styles.neuralStrandPulseFill, heartbeatAnim]}
                                 />
                               ) : null}
                             </View>
@@ -267,9 +267,17 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     overflow: 'hidden',
   },
-  neuralPulseFill: {
+  diamondField: {
+    backgroundColor: DIAMOND_CYAN,
+  },
+  diamondNeuralStrand: {
+    backgroundColor: 'rgba(184,255,255,0.14)',
+    borderWidth: 3,
+    borderColor: NEURAL_STRAND_BORDER_ICY,
+  },
+  neuralStrandPulseFill: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,255,255,0.28)',
+    backgroundColor: 'rgba(184,255,255,0.28)',
   },
   coverTile: {
     borderRadius: 2,
