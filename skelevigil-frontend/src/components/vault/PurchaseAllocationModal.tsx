@@ -5,11 +5,34 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { VaultAttemptsLeft } from '@/src/preferences/vaultProgress';
+import { PHASE_ACCENTS } from '@/src/theme/phaseAccents';
 import { SV } from '@/src/theme/skelevigil';
 
 export type VaultPhaseTier = keyof VaultAttemptsLeft;
 
 const PHASE_ORDER: VaultPhaseTier[] = ['glimpse', 'stare', 'trance'];
+
+/** Border + fill tints: Glimpse grey, Stare teal, Trance amber (matches phase accents). */
+const PHASE_ALLOCATION_BTN: Record<
+  VaultPhaseTier,
+  { borderColor: string; backgroundColor: string; backgroundPressed: string }
+> = {
+  glimpse: {
+    borderColor: PHASE_ACCENTS.glimpse.primary,
+    backgroundColor: 'rgba(138, 142, 145, 0.14)',
+    backgroundPressed: 'rgba(138, 142, 145, 0.26)',
+  },
+  stare: {
+    borderColor: PHASE_ACCENTS.stare.primary,
+    backgroundColor: 'rgba(14, 149, 149, 0.14)',
+    backgroundPressed: 'rgba(14, 149, 149, 0.28)',
+  },
+  trance: {
+    borderColor: PHASE_ACCENTS.trance.primary,
+    backgroundColor: 'rgba(245, 191, 138, 0.12)',
+    backgroundPressed: 'rgba(245, 191, 138, 0.24)',
+  },
+};
 
 const PHASE_LABEL: Record<VaultPhaseTier, string> = {
   glimpse: 'Glimpse',
@@ -73,11 +96,18 @@ export function PurchaseAllocationModal({
             <>
               {PHASE_ORDER.map((tier) => {
                 const count = attemptsLeft[tier];
+                const pal = PHASE_ALLOCATION_BTN[tier];
                 return (
                   <Pressable
                     key={tier}
                     onPress={() => onSelectPhase(tier)}
-                    style={({ pressed }) => [styles.phaseBtn, pressed && styles.phaseBtnPressed]}
+                    style={({ pressed }) => [
+                      styles.phaseBtn,
+                      {
+                        borderColor: pal.borderColor,
+                        backgroundColor: pressed ? pal.backgroundPressed : pal.backgroundColor,
+                      },
+                    ]}
                     accessibilityRole="button"
                     accessibilityLabel={`Add to ${PHASE_LABEL[tier]}, current reserves ${count}`}>
                     <Text style={styles.phaseBtnText}>
@@ -164,15 +194,9 @@ const styles = StyleSheet.create({
     minHeight: 56,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: 'rgba(0,255,255,0.55)',
-    backgroundColor: 'rgba(0,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 14,
-  },
-  phaseBtnPressed: {
-    opacity: 0.92,
-    backgroundColor: 'rgba(0,255,255,0.2)',
   },
   phaseBtnText: {
     color: SV.surgicalWhite,
