@@ -113,6 +113,12 @@ export function StareRevealBoard({
                     const isNeural = neuralTileIndices.has(idx);
                     const isRevealed = revealed[idx] === true;
                     const disabledAll = failedIndex != null || timedOut;
+                    /** Match Glimpse: excavating a safe tile removes cover *and* lattice fill so void shows through. */
+                    const latticeDiamondStyle = isNeural
+                      ? styles.diamondNeuralStrand
+                      : isRevealed
+                        ? styles.diamondExcavated
+                        : styles.diamondField;
                     return (
                       <View key={idx} style={styles.cell}>
                         <View style={styles.diamondWrap} pointerEvents="none">
@@ -121,7 +127,7 @@ export function StareRevealBoard({
                             <View
                               style={[
                                 styles.diamond,
-                                isNeural ? styles.diamondNeuralStrand : styles.diamondField,
+                                latticeDiamondStyle,
                                 {
                                   width: diamondSidePx,
                                   height: diamondSidePx,
@@ -278,6 +284,10 @@ const styles = StyleSheet.create({
   },
   diamondField: {
     backgroundColor: DIAMOND_CYAN,
+  },
+  /** Safe tile excavated: no solid lattice fill (same idea as Glimpse `cellRevealed` + transparent neural off-cell). */
+  diamondExcavated: {
+    backgroundColor: 'transparent',
   },
   diamondNeuralStrand: {
     backgroundColor: 'rgba(184,255,255,0.14)',
