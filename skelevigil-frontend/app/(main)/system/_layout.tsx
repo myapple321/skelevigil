@@ -24,6 +24,14 @@ export default function SystemLayout() {
         }}
       />
       <Stack.Screen
+        name="lock-screen"
+        options={{
+          title: 'Lock-Screen',
+          headerBackTitleVisible: false,
+          headerLeft: () => <SvHeaderBack />,
+        }}
+      />
+      <Stack.Screen
         name="help"
         options={{
           title: 'Help & Questions',

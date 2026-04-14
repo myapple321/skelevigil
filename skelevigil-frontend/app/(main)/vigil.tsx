@@ -1,4 +1,5 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -23,6 +24,7 @@ import { GlimpseRevealBoard } from '@/src/components/game/GlimpseRevealBoard';
 import { StareRevealBoard } from '@/src/components/game/StareRevealBoard';
 import { GLIMPSE_HELP_HINT, GLIMPSE_HELP_SUMMARY } from '@/src/content/glimpsePhaseHelp';
 import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
+import { useSessionSecurity } from '@/src/contexts/SessionSecurityContext';
 import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
 import { shuffledGlimpseGreyPalette, shuffledStareGreyPalette } from '@/src/game/glimpsePalette';
 import { generateRandomNeuralBlocks, neuralBlockToTileIndex } from '@/src/game/neuralBlocks';
@@ -69,6 +71,7 @@ export default function VigilScreen() {
     vigilPhase === 'stare' ? 'stare' : vigilPhase === 'trance' ? 'trance' : 'glimpse';
 
   const { sfxEnabled } = useSfxPreference();
+  const { keepAwakeDuringMissions } = useSessionSecurity();
   const {
     progress,
     recordGlimpseSuccess,
@@ -231,6 +234,16 @@ export default function VigilScreen() {
       showTabBar();
     };
   }, [missionSuccessModalVisible, navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!keepAwakeDuringMissions) return undefined;
+      void activateKeepAwakeAsync();
+      return () => {
+        deactivateKeepAwake();
+      };
+    }, [keepAwakeDuringMissions]),
+  );
 
   useFocusEffect(
     useCallback(() => {

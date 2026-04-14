@@ -309,3 +309,15 @@ export async function transactionGrantMonthlyGiftRotation(uid: string): Promise<
     };
   });
 }
+
+/** Lightweight session ping used by inactivity warning "Continue Mission". */
+export async function writeSessionHeartbeat(uid: string): Promise<void> {
+  await setDoc(
+    vaultDocRef(uid),
+    {
+      sessionHeartbeatAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+}

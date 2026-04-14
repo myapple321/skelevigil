@@ -10,6 +10,7 @@ import 'react-native-reanimated';
 import { AuthGate } from '@/src/components/auth/AuthGate';
 import { MissionNotificationsBinder } from '@/src/components/notifications/MissionNotificationsBinder';
 import { MissionAlertProvider } from '@/src/contexts/MissionAlertContext';
+import { SessionSecurityProvider } from '@/src/contexts/SessionSecurityContext';
 import { SfxPreferenceProvider } from '@/src/contexts/SfxPreferenceContext';
 import { VaultProgressProvider } from '@/src/contexts/VaultProgressContext';
 
@@ -60,14 +61,16 @@ export default function RootLayout() {
       <SfxPreferenceProvider>
         <MissionAlertProvider>
           <VaultProgressProvider>
-            {Platform.OS !== 'web' ? <MissionNotificationsBinder /> : null}
-            <AuthGate>
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="(main)" />
-                <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: true }} />
-              </Stack>
-            </AuthGate>
+            <SessionSecurityProvider>
+              {Platform.OS !== 'web' ? <MissionNotificationsBinder /> : null}
+              <AuthGate>
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="(main)" />
+                  <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: true }} />
+                </Stack>
+              </AuthGate>
+            </SessionSecurityProvider>
           </VaultProgressProvider>
         </MissionAlertProvider>
       </SfxPreferenceProvider>

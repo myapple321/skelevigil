@@ -341,6 +341,12 @@ export default function SystemIndexScreen() {
           />
           <View style={styles.divider} />
           <Row
+            title="Lock-Screen"
+            iconName="lock-closed-outline"
+            onPress={() => router.push('/(main)/system/lock-screen')}
+          />
+          <View style={styles.divider} />
+          <Row
             title="Delete Account"
             iconName="trash-outline"
             onPress={() => {
