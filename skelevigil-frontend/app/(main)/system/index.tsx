@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useMissionAlert } from '@/src/contexts/MissionAlertContext';
+import { useSessionSecurity } from '@/src/contexts/SessionSecurityContext';
 import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
 import { PurchaseAllocationModal } from '@/src/components/vault/PurchaseAllocationModal';
 import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
@@ -124,25 +125,42 @@ function Row({
   title,
   onPress,
   iconName,
+  valueSuffix,
 }: {
   title: string;
   onPress: () => void;
   iconName: IoniconName;
+  /** Optional inline value shown near chevron, e.g. current Lock-Screen timeout. */
+  valueSuffix?: string;
 }) {
+  const a11yLabel = valueSuffix ? `${title}, ${valueSuffix}` : title;
   return (
     <Pressable
       onPress={onPress}
+      accessibilityLabel={a11yLabel}
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
       <View style={styles.rowMain}>
         <Ionicons name={iconName} size={22} color={SV.neonCyan} style={styles.rowIcon} />
-        <Text style={styles.rowTitle}>{title}</Text>
+        <View style={styles.rowTitleWrap}>
+          <Text style={styles.rowTitle} numberOfLines={1}>
+            {title}
+          </Text>
+        </View>
       </View>
-      <Ionicons name="chevron-forward" size={18} color={SV.muted} />
+      <View style={styles.rowTail}>
+        {valueSuffix ? (
+          <Text style={styles.rowValueSuffix} numberOfLines={1}>
+            {valueSuffix}
+          </Text>
+        ) : null}
+        <Ionicons name="chevron-forward" size={18} color={SV.muted} />
+      </View>
     </Pressable>
   );
 }
 
 export default function SystemIndexScreen() {
+  const { lockScreenMinutes, hydrated: lockScreenPrefsHydrated } = useSessionSecurity();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -343,6 +361,9 @@ export default function SystemIndexScreen() {
           <Row
             title="Lock-Screen"
             iconName="lock-closed-outline"
+            valueSuffix={
+              lockScreenPrefsHydrated ? `${lockScreenMinutes} Minutes` : undefined
+            }
             onPress={() => router.push('/(main)/system/lock-screen')}
           />
           <View style={styles.divider} />
@@ -522,10 +543,24 @@ const styles = StyleSheet.create({
   rowPressed: {
     backgroundColor: 'rgba(0,255,255,0.06)',
   },
-  rowTitle: {
+  rowTitleWrap: {
     flex: 1,
+    minWidth: 0,
+  },
+  rowTitle: {
     color: SV.surgicalWhite,
     fontSize: 16,
+    fontWeight: '600',
+  },
+  rowTail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 8,
+  },
+  rowValueSuffix: {
+    color: SV.muted,
+    fontSize: 14,
     fontWeight: '600',
   },
   toggleRow: {
