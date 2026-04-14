@@ -35,8 +35,8 @@ type Props = {
 };
 
 /**
- * Stare: 10×5 diamond lattice with teal-tinted cover tiles over the lattice (play phase).
- * Covers are opaque excavation tiles — teal tint keeps phase color when tiles are on.
+ * Stare: 10×5 diamond lattice; play-phase covers are rotated squares matching each diamond
+ * (not axis-aligned cell rectangles), so the mesh stays visually diamond-shaped.
  */
 export function StareRevealBoard({
   borderColor,
@@ -114,9 +114,7 @@ export function StareRevealBoard({
                     const isRevealed = revealed[idx] === true;
                     const disabledAll = failedIndex != null || timedOut;
                     return (
-                      <View
-                        key={idx}
-                        style={[styles.cell, showTiles && styles.cellPlayClip]}>
+                      <View key={idx} style={styles.cell}>
                         <View style={styles.diamondWrap} pointerEvents="none">
                           {diamondSidePx != null &&
                           (showTiles || isNeural) ? (
@@ -139,28 +137,37 @@ export function StareRevealBoard({
                             </View>
                           ) : null}
                         </View>
-                        {showTiles ? (
-                          <Pressable
-                            disabled={isRevealed || disabledAll}
-                            onPress={() => onRevealCell(idx)}
-                            style={styles.tileHit}
-                            accessibilityRole="button"
-                            accessibilityLabel={
-                              isRevealed ? `Tile ${idx + 1} revealed` : `Remove tile ${idx + 1}`
-                            }
-                            accessibilityState={{ disabled: isRevealed }}>
-                            <Animated.View
+                        {showTiles && diamondSidePx != null ? (
+                          <View style={styles.coverDiamondSlot} pointerEvents="box-none">
+                            <Pressable
+                              disabled={isRevealed || disabledAll}
+                              onPress={() => onRevealCell(idx)}
                               style={[
-                                StyleSheet.absoluteFillObject,
-                                styles.coverTile,
-                                isRevealed ? styles.coverTileRevealed : null,
-                                !isRevealed
-                                  ? { backgroundColor: colors[idx] ?? SV.muted }
-                                  : null,
-                                idx === failedIndex ? failAnim : null,
+                                styles.coverPressableFace,
+                                {
+                                  width: diamondSidePx,
+                                  height: diamondSidePx,
+                                  transform: [{ translateY: nudgeY }, { rotate: '45deg' }],
+                                },
                               ]}
-                            />
-                          </Pressable>
+                              accessibilityRole="button"
+                              accessibilityLabel={
+                                isRevealed ? `Tile ${idx + 1} revealed` : `Remove tile ${idx + 1}`
+                              }
+                              accessibilityState={{ disabled: isRevealed }}>
+                              <Animated.View
+                                style={[
+                                  StyleSheet.absoluteFillObject,
+                                  styles.coverTile,
+                                  isRevealed ? styles.coverTileRevealed : null,
+                                  !isRevealed
+                                    ? { backgroundColor: colors[idx] ?? SV.muted }
+                                    : null,
+                                  idx === failedIndex ? failAnim : null,
+                                ]}
+                              />
+                            </Pressable>
+                          </View>
                         ) : null}
                       </View>
                     );
@@ -247,15 +254,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     position: 'relative',
   },
-  /** Clip cover tiles to the cell so absolute overlays cannot paint “vertical slabs” across rows. */
-  cellPlayClip: {
-    overflow: 'hidden',
-  },
-  /** Must sit above diamonds and stay bounded to the cell (fixes bogus stacked grey planes). */
-  tileHit: {
+  /** Centers the excavation cover on the same rotated square as the diamond mesh (not a full cell rectangle). */
+  coverDiamondSlot: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 4,
     elevation: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverPressableFace: {
+    borderRadius: 1,
+    overflow: 'hidden',
   },
   diamondWrap: {
     flex: 1,
