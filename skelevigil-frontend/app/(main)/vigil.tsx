@@ -657,46 +657,71 @@ export default function VigilScreen() {
       </Modal>
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          isMissionGrid && isStare && styles.scrollContentStare,
+        ]}
         removeClippedSubviews={false}
         showsVerticalScrollIndicator={false}>
         {isMissionGrid ? (
           <>
         <Text
-          style={[styles.title, phase === 'play' && styles.titlePlaySpacing, { color: accent.primary }]}>
+          style={[
+            styles.title,
+            phase === 'play' &&
+              (isStare ? styles.titleStarePlaySpacing : styles.titlePlaySpacing),
+            isStare && phase !== 'play' && styles.titleStareCompact,
+            { color: accent.primary },
+          ]}>
           {accent.title}
         </Text>
         {phaseLocked ? (
-          <Text style={styles.lockedHint} accessibilityLiveRegion="polite">
+          <Text
+            style={[styles.lockedHint, isStare && styles.stareCompactHintFooter]}
+            accessibilityLiveRegion="polite">
             {reserveEmptyPhaseLabel} attempts are depleted. Buy 3 Vault Credits to continue this mission.
           </Text>
         ) : phase === 'memorize' ? (
-          <Text style={styles.memorizeHint} accessibilityLiveRegion="polite">
+          <Text
+            style={[styles.memorizeHint, isStare && styles.stareCompactHintFooter]}
+            accessibilityLiveRegion="polite">
             {isStare
               ? `Memorize the neural strand. Covers return in ${memorizeSecondsLeft}s — then you have ${STARE_PLAY_TIME_SEC}s to excavate.`
               : `Memorize the neural blocks. Tiles return in ${memorizeSecondsLeft}s.`}
           </Text>
         ) : phase === 'paused' ? (
-          <Text style={styles.tabReturnHint} accessibilityLiveRegion="polite">
+          <Text
+            style={[
+              styles.tabReturnHint,
+              isStare && styles.stareCompactHintFooter,
+              isStare && styles.stareTabReturnTight,
+            ]}
+            accessibilityLiveRegion="polite">
             {hasBegunSortieRef.current
               ? "Session paused. Tap 'New Mission' when you are ready to continue."
               : "Mission grid is idle. Tap 'New Mission' to deploy your first sortie."}
           </Text>
         ) : awaitingNewMissionAfterSuccess ? (
-          <Text style={styles.successStandbyHint} accessibilityLiveRegion="polite">
+          <Text
+            style={[styles.successStandbyHint, isStare && styles.stareCompactHintFooter]}
+            accessibilityLiveRegion="polite">
             Excavation secured. Tap &apos;New Mission&apos; when you are ready for the next sortie.
           </Text>
         ) : timedOut ? (
-          <Text style={styles.timeoutHint} accessibilityLiveRegion="polite">
+          <Text
+            style={[styles.timeoutHint, isStare && styles.stareCompactHintFooter]}
+            accessibilityLiveRegion="polite">
             The excavation has collapsed. Tap &apos;New Mission&apos; to attempt a re-sync.
           </Text>
         ) : failedIndex != null ? (
-          <Text style={styles.failHint} accessibilityLiveRegion="polite">
+          <Text
+            style={[styles.failHint, isStare && styles.stareCompactHintFooter]}
+            accessibilityLiveRegion="polite">
             The Strand has shattered. Tap &apos;New Mission&apos; to start again.
           </Text>
         ) : phase === 'play' ? (
           <View
-            style={styles.excavationBarWrap}
+            style={[styles.excavationBarWrap, isStare && styles.stareCompactExcavationBar]}
             accessibilityLabel={`Excavation time, ${playSecondsLeft} seconds remaining`}
             accessibilityLiveRegion="polite">
             <View style={styles.excavationBarTrack}>
@@ -716,7 +741,7 @@ export default function VigilScreen() {
             </Text>
           </View>
         ) : null}
-        <View style={styles.gridWrap}>
+        <View style={[styles.gridWrap, isStare && styles.gridWrapStare]}>
           {isGlimpse ? (
             <GlimpseRevealBoard
               colors={gridColors}
@@ -920,6 +945,11 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     alignItems: 'center',
   },
+  /** Less outer padding so hint → playbox and playbox → actions fit on one screen for Stare. */
+  scrollContentStare: {
+    paddingTop: 2,
+    paddingBottom: 10,
+  },
   title: {
     color: SV.surgicalWhite,
     fontSize: 20,
@@ -929,6 +959,14 @@ const styles = StyleSheet.create({
   },
   titlePlaySpacing: {
     marginBottom: 20,
+  },
+  /** Stare play: slightly tighter than Glimpse under the phase title during excavation. */
+  titleStarePlaySpacing: {
+    marginBottom: 14,
+  },
+  /** Stare: tall playbox needs tighter chrome so New Mission stays on screen. */
+  titleStareCompact: {
+    marginBottom: 6,
   },
   memorizeHint: {
     color: SV.neonCyan,
@@ -976,6 +1014,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     marginBottom: 16,
     alignSelf: 'center',
+  },
+  stareCompactExcavationBar: {
+    marginBottom: 8,
   },
   excavationTimeCaption: {
     marginTop: 6,
@@ -1041,10 +1082,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     maxWidth: 360,
   },
+  stareTabReturnTight: {
+    paddingVertical: 3,
+  },
+  /** Tighter gap above / below the Stare playbox (hint → grid, grid → New Mission). */
+  stareCompactHintFooter: {
+    marginBottom: 4,
+  },
   gridWrap: {
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
+  },
+  gridWrapStare: {
+    marginBottom: 2,
   },
   newGameRow: {
     flexDirection: 'row',

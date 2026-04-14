@@ -6,7 +6,8 @@ import { SV } from '@/src/theme/skelevigil';
 const ROWS = 10;
 const COLS = 5;
 
-const PLAY_BOX_ASPECT_RATIO = 5 / 9;
+/** Slightly shorter than 5/9 so Stare fits typical phone viewports with chrome below. */
+const PLAY_BOX_ASPECT_RATIO = 5 / 8.25;
 const FIELD_BLACK = '#121212';
 /** Non-neural lattice fill (teal) — full grid only during play; hidden in memorize so the strand stands out. */
 const DIAMOND_CYAN = SV.neonCyan;
@@ -16,7 +17,8 @@ const VERT_NUDGE_DP = 38;
 const ROW_STACK_DP = 44;
 const BETWEEN_PAIRS_ROW_OVERLAP_DP = 78;
 const DIAMOND_SIDE_FIT = 0.997;
-const BORDER_VERTICAL_INSET_DP = 34;
+/** Inset of bordered face inside outer frame — large values waste vertical space above/below the teal border. */
+const BORDER_VERTICAL_INSET_DP = 12;
 /** Min gap between flex columns (pt). Avoid ~0 values — tiny `gap` breaks column widths on some RN builds. */
 const ROW_GAP = 1;
 
