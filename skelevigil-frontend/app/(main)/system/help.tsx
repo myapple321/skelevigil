@@ -50,12 +50,30 @@ One-time purchase: This is not a subscription. You will only be charged when you
 Guest Users: Please note that Guest accounts are not permitted to make purchases to protect your funds. You must link a Google, Apple, or Email account first.`,
   },
   {
+    question: 'What is SkeleVigil Lock-Screen Option?',
+    answer: `The Lock-Screen is a dual-purpose security and power-management feature designed to protect your session while accommodating the slower, deliberate pace of neural excavation.
+
+1. The Inactivity Timer
+Unlike a full logout, the Lock-Screen puts the app into a "Secure State" after a set period of inactivity. You can select between four increments:
+5 Minutes: For high-security environments.
+10 Minutes: The standard balanced default.
+20 Minutes: For a more relaxed, uninterrupted experience.
+30 Minutes: The maximum allowable idle time.
+
+2. Keep Awake Integration
+To prevent frustration during deep-focus missions, the system includes a Keep Awake toggle.
+How it works: When enabled, it overrides the iPhone's system "Auto-Lock" (1–5 minutes).
+The Result: Your screen stays bright as long as you are on a Vigil mission, though the 30-minute internal app timer remains active as a final safety net.`,
+  },
+  {
     question: 'What is in the System settings?',
     answer: `Manage Profile: Update your details or change your secure password.
 
 Sound Effects: Toggle the "Vigil" audio on or off. Default is off.
 
 System Notifications: Enable or disable Mission Alerts. Default is off.
+
+Lock-Screen: Selecting inactivity timeout options: 5, 10, 20, or 30 Minutes. Enabling 'Keep Awake' in settings will prevent your device from sleeping during active Missions.
 
 Delete Account: Permanently remove your data from our servers.`,
   },
@@ -235,7 +253,7 @@ const styles = StyleSheet.create({
   },
   faqQuestion: {
     flex: 1,
-    color: SV.surgicalWhite,
+    color: SV.neonCyan,
     fontSize: 18,
     fontWeight: '700',
     lineHeight: 26,
@@ -244,7 +262,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   faqAnswer: {
-    color: SV.surgicalWhite,
+    color: 'rgba(240, 240, 240, 0.92)',
     fontSize: 18,
     fontWeight: '500',
     lineHeight: 26,
