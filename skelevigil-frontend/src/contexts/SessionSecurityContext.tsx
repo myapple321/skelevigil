@@ -43,22 +43,6 @@ type SessionSecurityContextValue = {
 
 const SessionSecurityContext = createContext<SessionSecurityContextValue | null>(null);
 
-async function dimScreenToBatterySaver(): Promise<void> {
-  try {
-    await Brightness.setBrightnessAsync(0.2);
-  } catch {
-    // Non-fatal: some targets do not allow brightness control.
-  }
-}
-
-async function restoreScreenBrightness(): Promise<void> {
-  try {
-    await Brightness.setBrightnessAsync(1);
-  } catch {
-    // Ignore if brightness cannot be restored programmatically.
-  }
-}
-
 function lockMsFromMinutes(minutes: LockScreenMinutes): number {
   return minutes * 60 * 1000;
 }
@@ -77,6 +61,8 @@ export function SessionSecurityProvider({ children }: { children: ReactNode }) {
   const appStateRef = useRef(AppState.currentState);
   const logoutInFlightRef = useRef(false);
   const dimmedRef = useRef(false);
+  /** Captured with getBrightnessAsync() immediately before dimming; restored on resume (not forced to 100%). */
+  const brightnessBeforeDimRef = useRef<number | null>(null);
   const warningRaisedRef = useRef(false);
   const lastActivityMsRef = useRef(Date.now());
   const lockMinutesRef = useRef<LockScreenMinutes>(DEFAULT_LOCK_SCREEN_MINUTES);
@@ -92,6 +78,30 @@ export function SessionSecurityProvider({ children }: { children: ReactNode }) {
     await persistKeepAwakeDuringMissions(enabled);
   }, []);
 
+  const restoreScreenBrightness = useCallback(async () => {
+    try {
+      const prev = brightnessBeforeDimRef.current;
+      brightnessBeforeDimRef.current = null;
+      if (prev != null && Number.isFinite(prev)) {
+        const clamped = Math.min(1, Math.max(0, prev));
+        await Brightness.setBrightnessAsync(clamped);
+      }
+    } catch {
+      // Ignore if brightness cannot be restored programmatically.
+    }
+  }, []);
+
+  const dimScreenToBatterySaver = useCallback(async () => {
+    try {
+      const current = await Brightness.getBrightnessAsync();
+      brightnessBeforeDimRef.current = current;
+      await Brightness.setBrightnessAsync(0.2);
+    } catch {
+      brightnessBeforeDimRef.current = null;
+      // Non-fatal: some targets do not allow brightness control.
+    }
+  }, []);
+
   const restoreAfterActivity = useCallback(() => {
     if (!warningRaisedRef.current && !dimmedRef.current) return;
     warningRaisedRef.current = false;
@@ -100,7 +110,7 @@ export function SessionSecurityProvider({ children }: { children: ReactNode }) {
       dimmedRef.current = false;
       void restoreScreenBrightness();
     }
-  }, []);
+  }, [restoreScreenBrightness]);
 
   const registerUserActivity = useCallback(() => {
     if (!signedInUid) return;
@@ -124,7 +134,7 @@ export function SessionSecurityProvider({ children }: { children: ReactNode }) {
     } finally {
       logoutInFlightRef.current = false;
     }
-  }, []);
+  }, [restoreScreenBrightness]);
 
   useEffect(() => {
     let cancelled = false;
@@ -153,7 +163,7 @@ export function SessionSecurityProvider({ children }: { children: ReactNode }) {
       }
     });
     return unsub;
-  }, []);
+  }, [restoreScreenBrightness]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -189,7 +199,7 @@ export function SessionSecurityProvider({ children }: { children: ReactNode }) {
       clearInterval(interval);
       appStateSub.remove();
     };
-  }, [handleSecureLogout, hydrated, signedInUid]);
+  }, [dimScreenToBatterySaver, handleSecureLogout, hydrated, signedInUid]);
 
   const onContinueMission = useCallback(() => {
     registerUserActivity();
