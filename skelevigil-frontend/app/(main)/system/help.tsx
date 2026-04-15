@@ -280,6 +280,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 28,
     marginBottom: 14,
+    textAlign: 'center',
   },
   /** Help tab only: under bright “Help” title, same hierarchy as FAQ question rows. */
   helpSectionSubheading: {
