@@ -11,7 +11,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PHASE_ACCENTS } from '@/src/theme/phaseAccents';
 import { SV } from '@/src/theme/skelevigil';
+
+const SEGMENT_ACTIVE_BG = PHASE_ACCENTS.stare.primary;
+const SEGMENT_INACTIVE_BG = 'rgba(0, 255, 255, 0.14)';
+const SEGMENT_INACTIVE_TEXT = '#0A6B6C';
+
+/** Softer than `SV.neonCyan` so FAQ accordion rows sit under the bright “FAQ — …” header. */
+const FAQ_ITEM_QUESTION_TEAL = '#6EC9C9';
 
 const SUPPORT_EMAIL = 'support@veridiar.com';
 
@@ -102,7 +110,7 @@ function FaqAccordionItem({
         <Ionicons
           name={expanded ? 'chevron-up' : 'chevron-down'}
           size={22}
-          color={SV.neonCyan}
+          color={FAQ_ITEM_QUESTION_TEAL}
           style={styles.faqChevron}
         />
       </Pressable>
@@ -111,7 +119,10 @@ function FaqAccordionItem({
   );
 }
 
+type HelpSegment = 'help' | 'questions';
+
 export default function HelpQuestionsScreen() {
+  const [segment, setSegment] = useState<HelpSegment>('help');
   const [expandedFaqIndex, setExpandedFaqIndex] = useState<number | null>(null);
 
   const toggleFaq = useCallback((index: number) => {
@@ -130,45 +141,82 @@ export default function HelpQuestionsScreen() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator
         keyboardShouldPersistTaps="handled">
-        <Text style={styles.sectionTitle}>Help</Text>
-
-        <Text style={styles.subheading}>Getting Started</Text>
-        <Text style={styles.body}>
-          {`Your journey begins in the Phases tab. Select your desired difficulty level to establish a connection with the Vigil. Once inside, your goal is to observe the neural block and secure the underlying sequence before the excavation collapses.
-
-When you have correctly identified all nodes, tap Finish Excavation. This will finalize your progress and confirm if the neural strand is secured or if the mission has shattered.`}
-        </Text>
-
-        <Text style={[styles.subheading, styles.helpSubSpaced]}>Settings</Text>
-        <Text style={styles.body}>
-          Tailor your experience in the System tab. Here you can manage your security, toggle mission
-          sounds, and adjust how the app communicates with you.
-        </Text>
-
-        <Text style={[styles.subheading, styles.helpSubSpaced]}>Support</Text>
-        <Text style={styles.body}>Our team is here to help with any technical hurdles.</Text>
-        <Pressable
-          onPress={openMailto}
-          style={({ pressed }) => [styles.emailPressable, pressed && styles.pressed]}
-          accessibilityRole="link"
-          accessibilityLabel={`Email ${SUPPORT_EMAIL}`}>
-          <Text style={styles.emailLink}>{SUPPORT_EMAIL}</Text>
-        </Pressable>
-
-        <View style={styles.sectionDivider} accessibilityRole="none">
-          <View style={styles.dividerLine} />
+        <View style={styles.segmentRow} accessibilityRole="tablist">
+          <Pressable
+            onPress={() => setSegment('help')}
+            style={({ pressed }) => [
+              styles.segmentBtn,
+              segment === 'help' ? styles.segmentBtnActive : styles.segmentBtnInactive,
+              pressed && styles.segmentBtnPressed,
+            ]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: segment === 'help' }}
+            accessibilityLabel="Help overview">
+            <Text
+              style={segment === 'help' ? styles.segmentLabelActive : styles.segmentLabelInactive}>
+              Help
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setSegment('questions')}
+            style={({ pressed }) => [
+              styles.segmentBtn,
+              segment === 'questions' ? styles.segmentBtnActive : styles.segmentBtnInactive,
+              pressed && styles.segmentBtnPressed,
+            ]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: segment === 'questions' }}
+            accessibilityLabel="Frequently asked questions">
+            <Text
+              style={
+                segment === 'questions' ? styles.segmentLabelActive : styles.segmentLabelInactive
+              }>
+              Questions
+            </Text>
+          </Pressable>
         </View>
 
-        <Text style={styles.sectionTitle}>FAQ — Frequently Asked Questions</Text>
-        {FAQ_ITEMS.map((item, index) => (
-          <FaqAccordionItem
-            key={item.question}
-            question={item.question}
-            answer={item.answer}
-            expanded={expandedFaqIndex === index}
-            onToggle={() => toggleFaq(index)}
-          />
-        ))}
+        {segment === 'help' ? (
+          <>
+            <Text style={styles.sectionTitle}>Help</Text>
+
+            <Text style={styles.subheading}>Getting Started</Text>
+            <Text style={styles.body}>
+              {`Your journey begins in the Phases tab. Select your desired difficulty level to establish a connection with the Vigil. Once inside, your goal is to observe the neural block and secure the underlying sequence before the excavation collapses.
+
+When you have correctly identified all nodes, tap Finish Excavation. This will finalize your progress and confirm if the neural strand is secured or if the mission has shattered.`}
+            </Text>
+
+            <Text style={[styles.subheading, styles.helpSubSpaced]}>Settings</Text>
+            <Text style={styles.body}>
+              Tailor your experience in the System tab. Here you can manage your security, toggle mission
+              sounds, and adjust how the app communicates with you.
+            </Text>
+
+            <Text style={[styles.subheading, styles.helpSubSpaced]}>Support</Text>
+            <Text style={styles.body}>Our team is here to help with any technical hurdles.</Text>
+            <Pressable
+              onPress={openMailto}
+              style={({ pressed }) => [styles.emailPressable, pressed && styles.pressed]}
+              accessibilityRole="link"
+              accessibilityLabel={`Email ${SUPPORT_EMAIL}`}>
+              <Text style={styles.emailLink}>{SUPPORT_EMAIL}</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Text style={styles.sectionTitle}>FAQ — Frequently Asked Questions</Text>
+            {FAQ_ITEMS.map((item, index) => (
+              <FaqAccordionItem
+                key={item.question}
+                question={item.question}
+                answer={item.answer}
+                expanded={expandedFaqIndex === index}
+                onToggle={() => toggleFaq(index)}
+              />
+            ))}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -186,6 +234,45 @@ const styles = StyleSheet.create({
     maxWidth: 720,
     width: '100%',
     alignSelf: 'center',
+  },
+  segmentRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 10,
+    marginBottom: 18,
+  },
+  segmentBtn: {
+    flex: 1,
+    minHeight: 48,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  segmentBtnActive: {
+    backgroundColor: SEGMENT_ACTIVE_BG,
+    borderColor: 'rgba(0, 255, 255, 0.45)',
+  },
+  segmentBtnInactive: {
+    backgroundColor: SEGMENT_INACTIVE_BG,
+    borderColor: 'rgba(0, 255, 255, 0.22)',
+  },
+  segmentBtnPressed: {
+    opacity: 0.9,
+  },
+  segmentLabelActive: {
+    color: SV.surgicalWhite,
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  segmentLabelInactive: {
+    color: SEGMENT_INACTIVE_TEXT,
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   sectionTitle: {
     color: SV.neonCyan,
@@ -228,15 +315,6 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.88,
   },
-  sectionDivider: {
-    marginVertical: 28,
-    width: '100%',
-  },
-  dividerLine: {
-    height: 2,
-    backgroundColor: 'rgba(0, 255, 255, 0.55)',
-    borderRadius: 1,
-  },
   faqItem: {
     marginBottom: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -253,7 +331,7 @@ const styles = StyleSheet.create({
   },
   faqQuestion: {
     flex: 1,
-    color: SV.neonCyan,
+    color: FAQ_ITEM_QUESTION_TEAL,
     fontSize: 18,
     fontWeight: '700',
     lineHeight: 26,
