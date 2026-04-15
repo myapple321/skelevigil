@@ -18,8 +18,8 @@ const SEGMENT_ACTIVE_BG = PHASE_ACCENTS.stare.primary;
 const SEGMENT_INACTIVE_BG = 'rgba(0, 255, 255, 0.14)';
 const SEGMENT_INACTIVE_TEXT = '#0A6B6C';
 
-/** Softer than `SV.neonCyan` so FAQ accordion rows sit under the bright “FAQ — …” header. */
-const FAQ_ITEM_QUESTION_TEAL = '#6EC9C9';
+/** Softer than `SV.neonCyan` for section subheads under bright titles (Help + FAQ). */
+const SECTION_SOFT_TEAL = '#6EC9C9';
 
 const SUPPORT_EMAIL = 'support@veridiar.com';
 
@@ -110,7 +110,7 @@ function FaqAccordionItem({
         <Ionicons
           name={expanded ? 'chevron-up' : 'chevron-down'}
           size={22}
-          color={FAQ_ITEM_QUESTION_TEAL}
+          color={SECTION_SOFT_TEAL}
           style={styles.faqChevron}
         />
       </Pressable>
@@ -180,20 +180,20 @@ export default function HelpQuestionsScreen() {
           <>
             <Text style={styles.sectionTitle}>Help</Text>
 
-            <Text style={styles.subheading}>Getting Started</Text>
+            <Text style={styles.helpSectionSubheading}>Getting Started</Text>
             <Text style={styles.body}>
               {`Your journey begins in the Phases tab. Select your desired difficulty level to establish a connection with the Vigil. Once inside, your goal is to observe the neural block and secure the underlying sequence before the excavation collapses.
 
 When you have correctly identified all nodes, tap Finish Excavation. This will finalize your progress and confirm if the neural strand is secured or if the mission has shattered.`}
             </Text>
 
-            <Text style={[styles.subheading, styles.helpSubSpaced]}>Settings</Text>
+            <Text style={[styles.helpSectionSubheading, styles.helpSubSpaced]}>Settings</Text>
             <Text style={styles.body}>
               Tailor your experience in the System tab. Here you can manage your security, toggle mission
               sounds, and adjust how the app communicates with you.
             </Text>
 
-            <Text style={[styles.subheading, styles.helpSubSpaced]}>Support</Text>
+            <Text style={[styles.helpSectionSubheading, styles.helpSubSpaced]}>Support</Text>
             <Text style={styles.body}>Our team is here to help with any technical hurdles.</Text>
             <Pressable
               onPress={openMailto}
@@ -281,8 +281,9 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     marginBottom: 14,
   },
-  subheading: {
-    color: SV.neonCyan,
+  /** Help tab only: under bright “Help” title, same hierarchy as FAQ question rows. */
+  helpSectionSubheading: {
+    color: SECTION_SOFT_TEAL,
     fontSize: 18,
     fontWeight: '700',
     lineHeight: 24,
@@ -331,7 +332,7 @@ const styles = StyleSheet.create({
   },
   faqQuestion: {
     flex: 1,
-    color: FAQ_ITEM_QUESTION_TEAL,
+    color: SECTION_SOFT_TEAL,
     fontSize: 18,
     fontWeight: '700',
     lineHeight: 26,
