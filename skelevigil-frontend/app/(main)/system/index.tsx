@@ -366,6 +366,10 @@ export default function SystemIndexScreen() {
             }
             onPress={() => router.push('/(main)/system/lock-screen')}
           />
+          <Text style={styles.lockScreenSubtext}>
+            Select inactivity timeout options: 5, 10, 20, or 30 Minutes. Enabling &apos;Keep
+            Awake&apos; in settings will prevent your device from sleeping during active Missions.
+          </Text>
           <View style={styles.divider} />
           <Row
             title="Delete Account"
@@ -562,6 +566,17 @@ const styles = StyleSheet.create({
     color: SV.muted,
     fontSize: 14,
     fontWeight: '600',
+  },
+  /** Align with row title column (matches divider inset). */
+  lockScreenSubtext: {
+    marginLeft: 16 + 22 + 12,
+    marginRight: 16,
+    marginTop: -6,
+    marginBottom: 10,
+    color: SV.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
   },
   toggleRow: {
     paddingHorizontal: 16,
