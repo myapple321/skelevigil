@@ -122,16 +122,20 @@ export default function VaultScreen() {
             <Text style={styles.buyButtonText}>Buy 3 Vault Credits - $0.99</Text>
           </Pressable>
           <Text style={styles.buySubtext}>One-time purchase. No recurring fees.</Text>
-
-          {isGuest ? (
-            <View style={styles.guestReminderRow}>
-              <Text style={styles.guestReminderText}>Status: Guest Mode (Unsecured). </Text>
-              <Pressable onPress={() => void goToLoginFromGuest()} style={styles.guestReminderLinkWrap}>
-                <Text style={styles.guestReminderLink}>Link Account</Text>
-              </Pressable>
-            </View>
-          ) : null}
         </View>
+
+        {isGuest ? (
+          <View style={styles.section}>
+            <Text style={styles.securitySectionTitle}>Vault Security</Text>
+            <View style={styles.securityCard}>
+              <Text style={styles.securityStatus}>Status: Guest Mode (Unsecured).</Text>
+              <Pressable onPress={() => void goToLoginFromGuest()} style={styles.securityLinkWrap}>
+                <Text style={styles.securityLink}>Link Account</Text>
+              </Pressable>
+              <Text style={styles.securityHint}>Secure your vault across devices.</Text>
+            </View>
+          </View>
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -252,33 +256,51 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 6,
   },
-  guestReminderRow: {
-    marginTop: 18,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    paddingHorizontal: 8,
-    gap: 4,
+  securitySectionTitle: {
+    color: '#E8AE73',
+    fontSize: 16,
+    fontWeight: '700',
+    marginTop: 2,
+    marginBottom: 10,
+    textAlign: 'center',
   },
-  guestReminderText: {
-    color: 'rgba(240,240,240,0.9)',
+  securityCard: {
+    borderWidth: 1,
+    borderColor: 'rgba(232,174,115,0.45)',
+    borderRadius: 10,
+    backgroundColor: 'rgba(120,56,40,0.16)',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  securityStatus: {
+    color: 'rgba(255,232,210,0.95)',
     fontSize: 17,
     lineHeight: 24,
     fontWeight: '600',
     textAlign: 'center',
   },
-  guestReminderLinkWrap: {
+  securityLinkWrap: {
+    marginTop: 4,
     paddingVertical: 8,
     paddingHorizontal: 6,
     minHeight: 44,
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  guestReminderLink: {
-    color: SV.neonCyan,
+  securityLink: {
+    color: '#FFD3AA',
     fontSize: 17,
     lineHeight: 24,
     fontWeight: '700',
     textDecorationLine: 'underline',
+  },
+  securityHint: {
+    marginTop: 2,
+    color: 'rgba(255,212,178,0.75)',
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });
