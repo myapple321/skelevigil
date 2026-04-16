@@ -65,48 +65,6 @@ function usersMirrorPayload(p: VaultProgress, authProvider: string): Record<stri
   };
 }
 
-/** When only `users/{uid}.vault` exists (legacy / alternate writer), hydrate VaultProgress. */
-function vaultProgressFromUsersDocMerge(data: Record<string, unknown> | undefined): VaultProgress | null {
-  if (!data) return null;
-  const vaultRaw = data.vault;
-  if (!vaultRaw || typeof vaultRaw !== 'object' || Array.isArray(vaultRaw)) return null;
-  const v = vaultRaw as Record<string, unknown>;
-  const hasAny =
-    typeof v.glimpseReserves === 'number' ||
-    typeof v.stareReserves === 'number' ||
-    typeof v.tranceReserves === 'number' ||
-    typeof v.restorationProgress === 'number' ||
-    typeof v.lifetimeMissions === 'number' ||
-    typeof v.giftRotationIndex === 'number';
-  if (!hasAny) return null;
-
-  const attemptsLeft = clampAttempts({
-    glimpse: typeof v.glimpseReserves === 'number' ? v.glimpseReserves : undefined,
-    stare: typeof v.stareReserves === 'number' ? v.stareReserves : undefined,
-    trance: typeof v.tranceReserves === 'number' ? v.tranceReserves : undefined,
-  });
-  const smRaw = v.restorationProgress;
-  const successfulMissions =
-    typeof smRaw === 'number' ? Math.max(0, Math.min(10, Math.trunc(smRaw))) : 0;
-  const lmRaw = v.lifetimeMissions;
-  const lifetimeMissions =
-    typeof lmRaw === 'number' ? Math.max(0, Math.trunc(lmRaw)) : DEFAULT_VAULT_PROGRESS.lifetimeMissions;
-  const griRaw = v.giftRotationIndex;
-  const giftRotationIndex =
-    typeof griRaw === 'number' && Number.isFinite(griRaw)
-      ? Math.min(2, Math.max(0, Math.trunc(griRaw) % 3))
-      : DEFAULT_VAULT_PROGRESS.giftRotationIndex;
-
-  return {
-    ...DEFAULT_VAULT_PROGRESS,
-    successfulMissions,
-    lifetimeMissions,
-    giftRotationIndex,
-    creditsTowardFreeMission: Math.max(0, FREE_MISSION_CREDIT_ALLOWANCE - successfulMissions),
-    attemptsLeft,
-  };
-}
-
 export async function syncUserVaultProgressAndUsersMirror(uid: string, p: VaultProgress): Promise<void> {
   const authProvider = resolveAuthProviderForMirror();
   const db = getFirebaseFirestore();
@@ -248,17 +206,7 @@ export function nextProgressAfterSuccess(prev: VaultProgress): {
   };
 }
 
-export async function seedVaultDocIfMissing(uid: string, seed: VaultProgress): Promise<void> {
-  const ref = vaultDocRef(uid);
-  const snap = await getDoc(ref);
-  if (snap.exists()) return;
-  await syncUserVaultProgressAndUsersMirror(uid, seed);
-}
-
-/**
- * Auth restore helper: fetch existing cloud progress, or initialize from local/guest progress.
- * This is used after successful member login so users keep their guest-earned progress.
- */
+/** Auth restore helper: fetch existing canonical progress, or initialize from local seed. */
 export async function fetchOrCreateVaultProgress(
   uid: string,
   seed: VaultProgress,
@@ -270,18 +218,6 @@ export async function fetchOrCreateVaultProgress(
     const p = progressFromDoc(snap.data() as Record<string, unknown>);
     await setDoc(usersDocRef(uid), usersMirrorPayload(p, authProvider), { merge: true });
     return p;
-  }
-  const userSnap = await getDoc(usersDocRef(uid));
-  if (userSnap.exists()) {
-    const fromUsers = vaultProgressFromUsersDocMerge(userSnap.data() as Record<string, unknown>);
-    if (fromUsers) {
-      const merged: VaultProgress = {
-        ...fromUsers,
-        attemptsLeft: { ...fromUsers.attemptsLeft },
-      };
-      await syncUserVaultProgressAndUsersMirror(uid, merged);
-      return merged;
-    }
   }
   const seeded: VaultProgress = {
     ...seed,
@@ -310,25 +246,7 @@ export function subscribeVaultProgress(
     vaultDocRef(uid),
     (snap) => {
       if (!snap.exists()) {
-        void (async () => {
-          try {
-            const userSnap = await getDoc(usersDocRef(uid));
-            if (!userSnap.exists()) {
-              onProgress(DEFAULT_VAULT_PROGRESS);
-              return;
-            }
-            const fromUsers = vaultProgressFromUsersDocMerge(
-              userSnap.data() as Record<string, unknown>,
-            );
-            if (!fromUsers) {
-              onProgress(DEFAULT_VAULT_PROGRESS);
-              return;
-            }
-            await syncUserVaultProgressAndUsersMirror(uid, fromUsers);
-          } catch {
-            onProgress(DEFAULT_VAULT_PROGRESS);
-          }
-        })();
+        onProgress(DEFAULT_VAULT_PROGRESS);
         return;
       }
       onProgress(progressFromDoc(snap.data() as Record<string, unknown>));
