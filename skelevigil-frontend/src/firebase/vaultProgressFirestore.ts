@@ -48,7 +48,7 @@ function resolveAuthProviderForMirror(): string {
 
 /**
  * Public profile doc mirror (`users/{uid}`) — kept in sync with `userVaultProgress/{uid}`.
- * `vault` uses product field names; canonical game state remains on userVaultProgress.
+ * `vault` uses product field names plus analytics fields; canonical game state remains on userVaultProgress.
  */
 function usersMirrorPayload(p: VaultProgress, authProvider: string): Record<string, unknown> {
   return {
@@ -57,6 +57,8 @@ function usersMirrorPayload(p: VaultProgress, authProvider: string): Record<stri
       stareReserves: p.attemptsLeft.stare,
       tranceReserves: p.attemptsLeft.trance,
       restorationProgress: p.successfulMissions,
+      lifetimeMissions: p.lifetimeMissions,
+      giftRotationIndex: p.giftRotationIndex,
     },
     lastSync: serverTimestamp(),
     authProvider,
@@ -73,7 +75,9 @@ function vaultProgressFromUsersDocMerge(data: Record<string, unknown> | undefine
     typeof v.glimpseReserves === 'number' ||
     typeof v.stareReserves === 'number' ||
     typeof v.tranceReserves === 'number' ||
-    typeof v.restorationProgress === 'number';
+    typeof v.restorationProgress === 'number' ||
+    typeof v.lifetimeMissions === 'number' ||
+    typeof v.giftRotationIndex === 'number';
   if (!hasAny) return null;
 
   const attemptsLeft = clampAttempts({
@@ -84,12 +88,20 @@ function vaultProgressFromUsersDocMerge(data: Record<string, unknown> | undefine
   const smRaw = v.restorationProgress;
   const successfulMissions =
     typeof smRaw === 'number' ? Math.max(0, Math.min(10, Math.trunc(smRaw))) : 0;
+  const lmRaw = v.lifetimeMissions;
+  const lifetimeMissions =
+    typeof lmRaw === 'number' ? Math.max(0, Math.trunc(lmRaw)) : DEFAULT_VAULT_PROGRESS.lifetimeMissions;
+  const griRaw = v.giftRotationIndex;
+  const giftRotationIndex =
+    typeof griRaw === 'number' && Number.isFinite(griRaw)
+      ? Math.min(2, Math.max(0, Math.trunc(griRaw) % 3))
+      : DEFAULT_VAULT_PROGRESS.giftRotationIndex;
 
   return {
     ...DEFAULT_VAULT_PROGRESS,
     successfulMissions,
-    lifetimeMissions: DEFAULT_VAULT_PROGRESS.lifetimeMissions,
-    giftRotationIndex: DEFAULT_VAULT_PROGRESS.giftRotationIndex,
+    lifetimeMissions,
+    giftRotationIndex,
     creditsTowardFreeMission: Math.max(0, FREE_MISSION_CREDIT_ALLOWANCE - successfulMissions),
     attemptsLeft,
   };
