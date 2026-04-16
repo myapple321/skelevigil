@@ -171,6 +171,16 @@ export async function seedVaultDocIfMissing(uid: string, seed: VaultProgress): P
   await setDoc(ref, toFirestorePayload(seed), { merge: true });
 }
 
+/** Debug / QA: overwrite vault doc with default reserves and mission progress. */
+export async function resetVaultProgressDocToDefault(uid: string): Promise<void> {
+  await setDoc(vaultDocRef(uid), toFirestorePayload(DEFAULT_VAULT_PROGRESS), { merge: true });
+}
+
+/** Debug / QA: write full vault state (same shape as normal sync). */
+export async function writeVaultProgressDoc(uid: string, p: VaultProgress): Promise<void> {
+  await setDoc(vaultDocRef(uid), toFirestorePayload(p), { merge: true });
+}
+
 export function subscribeVaultProgress(
   uid: string,
   onProgress: (p: VaultProgress) => void,

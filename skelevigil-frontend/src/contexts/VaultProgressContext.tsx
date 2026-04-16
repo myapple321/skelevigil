@@ -17,6 +17,8 @@ import {
   applyMonthlyGiftRotationClaim,
   freeMissionClaimedModalText,
   nextProgressAfterSuccess,
+  resetVaultProgressDocToDefault,
+  writeVaultProgressDoc,
   seedVaultDocIfMissing,
   subscribeVaultProgress,
   transactionGrantThreeVaultCreditsForPhase,
@@ -56,6 +58,10 @@ function alertVaultFirestoreError(e: unknown, context: 'save' | 'update') {
 type VaultProgressContextValue = {
   progress: VaultProgress;
   hydrated: boolean;
+  /** Debug: reset reserves, free-restoration progress, lifetime missions, and gift index to defaults. */
+  debugResetVaultProgressToDefault: () => Promise<void>;
+  /** Debug: set full vault state (Firestore or local + monthly gift reschedule). */
+  debugApplyVaultProgress: (next: VaultProgress) => Promise<void>;
   recordGlimpseSuccess: () => void;
   recordGlimpseFailure: () => void;
   recordMissionFailure: (tier: keyof VaultAttemptsLeft) => void;
@@ -299,10 +305,59 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
   const dismissReward = useCallback(() => setRewardModalVisible(false), []);
   const dismissMonthlyGift = useCallback(() => setMonthlyGiftModalVisible(false), []);
 
+  const debugResetVaultProgressToDefault = useCallback(async () => {
+    const fresh: VaultProgress = {
+      ...DEFAULT_VAULT_PROGRESS,
+      attemptsLeft: { ...DEFAULT_VAULT_PROGRESS.attemptsLeft },
+    };
+    if (firestoreUid) {
+      try {
+        await resetVaultProgressDocToDefault(firestoreUid);
+        setProgress(fresh);
+        await setVaultProgress(fresh);
+        await rescheduleMonthlyGiftFromNow(fresh.giftRotationIndex);
+      } catch (err) {
+        alertVaultFirestoreError(err, 'save');
+      }
+      return;
+    }
+
+    setProgress(fresh);
+    await setVaultProgress(fresh);
+    await rescheduleMonthlyGiftFromNow(fresh.giftRotationIndex);
+  }, [firestoreUid]);
+
+  const debugApplyVaultProgress = useCallback(
+    async (next: VaultProgress) => {
+      const snapshot: VaultProgress = {
+        ...next,
+        attemptsLeft: { ...next.attemptsLeft },
+      };
+      if (firestoreUid) {
+        try {
+          await writeVaultProgressDoc(firestoreUid, snapshot);
+          setProgress(snapshot);
+          await setVaultProgress(snapshot);
+          await rescheduleMonthlyGiftFromNow(snapshot.giftRotationIndex);
+        } catch (err) {
+          alertVaultFirestoreError(err, 'save');
+        }
+        return;
+      }
+
+      setProgress(snapshot);
+      await setVaultProgress(snapshot);
+      await rescheduleMonthlyGiftFromNow(snapshot.giftRotationIndex);
+    },
+    [firestoreUid],
+  );
+
   const value = useMemo(
     () => ({
       progress,
       hydrated,
+      debugResetVaultProgressToDefault,
+      debugApplyVaultProgress,
       recordGlimpseSuccess,
       recordGlimpseFailure,
       recordMissionFailure,
@@ -314,6 +369,8 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
     [
       progress,
       hydrated,
+      debugResetVaultProgressToDefault,
+      debugApplyVaultProgress,
       recordGlimpseSuccess,
       recordGlimpseFailure,
       recordMissionFailure,

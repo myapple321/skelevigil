@@ -33,6 +33,39 @@ export const DEFAULT_VAULT_PROGRESS: VaultProgress = {
   },
 };
 
+/**
+ * Debug / QA: coerce raw numbers into a valid VaultProgress. successfulMissions is clamped
+ * 0..FREE_MISSION_CREDIT_ALLOWANCE so it matches Firestore `progressFromDoc` behavior.
+ */
+export function normalizeVaultProgressFromDebugInput(input: {
+  glimpse: number;
+  stare: number;
+  trance: number;
+  successfulMissions: number;
+  lifetimeMissions: number;
+  giftRotationIndex: number;
+}): VaultProgress {
+  const successfulMissions = Math.max(
+    0,
+    Math.min(FREE_MISSION_CREDIT_ALLOWANCE, Math.trunc(input.successfulMissions)),
+  );
+  const lifetimeMissions = Math.max(0, Math.trunc(input.lifetimeMissions));
+  const giftRotationIndex = Number.isFinite(input.giftRotationIndex)
+    ? Math.min(2, Math.max(0, Math.trunc(input.giftRotationIndex) % 3))
+    : 0;
+  return {
+    creditsTowardFreeMission: Math.max(0, FREE_MISSION_CREDIT_ALLOWANCE - successfulMissions),
+    successfulMissions,
+    lifetimeMissions,
+    giftRotationIndex,
+    attemptsLeft: {
+      glimpse: Math.max(0, Math.trunc(input.glimpse)),
+      stare: Math.max(0, Math.trunc(input.stare)),
+      trance: Math.max(0, Math.trunc(input.trance)),
+    },
+  };
+}
+
 export async function getVaultProgress(): Promise<VaultProgress> {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);

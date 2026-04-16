@@ -21,6 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMissionAlert } from '@/src/contexts/MissionAlertContext';
 import { useSessionSecurity } from '@/src/contexts/SessionSecurityContext';
 import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
+import { DebugVaultValuesModal } from '@/src/components/vault/DebugVaultValuesModal';
 import { PurchaseAllocationModal } from '@/src/components/vault/PurchaseAllocationModal';
 import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
 import {
@@ -165,8 +166,15 @@ export default function SystemIndexScreen() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteNeedsRecentSignIn, setDeleteNeedsRecentSignIn] = useState(false);
-  const { progress, grantThreeVaultCreditsToPhase } = useVaultProgress();
+  const {
+    progress,
+    grantThreeVaultCreditsToPhase,
+    hydrated: vaultHydrated,
+    debugResetVaultProgressToDefault,
+    debugApplyVaultProgress,
+  } = useVaultProgress();
   const [debugPurchaseAllocOpen, setDebugPurchaseAllocOpen] = useState(false);
+  const [debugVaultModalOpen, setDebugVaultModalOpen] = useState(false);
   const [systemUser, setSystemUser] = useState<User | null>(() => getFirebaseAuth().currentUser);
 
   useEffect(() => {
@@ -188,7 +196,7 @@ export default function SystemIndexScreen() {
 
   const debugMissionAlertsReady = missionAlertsHydrated && missionAlertsEnabled;
 
-  type DebugActionKey = 'buy' | 'reengagement' | 'monthlyGift';
+  type DebugActionKey = 'buy' | 'resetVault' | 'reengagement' | 'monthlyGift';
   const [debugActionBusy, setDebugActionBusy] = useState<DebugActionKey | null>(null);
   const debugAsyncGateRef = useRef(false);
 
@@ -254,6 +262,19 @@ export default function SystemIndexScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <DebugVaultValuesModal
+        visible={debugVaultModalOpen}
+        onRequestClose={() => setDebugVaultModalOpen(false)}
+        seedProgress={progress}
+        busy={debugActionBusy === 'resetVault'}
+        onApply={async (next) => {
+          await runDebugAsync('resetVault', () => debugApplyVaultProgress(next));
+          setDebugVaultModalOpen(false);
+        }}
+        onResetToDefaults={async () => {
+          await runDebugAsync('resetVault', () => debugResetVaultProgressToDefault());
+        }}
+      />
       <PurchaseAllocationModal
         visible={debugPurchaseAllocOpen}
         onRequestClose={() => setDebugPurchaseAllocOpen(false)}
@@ -434,6 +455,21 @@ export default function SystemIndexScreen() {
               pressed && debugActionBusy === null && styles.debugBuyPressed,
             ]}>
             <Text style={styles.debugBuyText}>DEBUG [Buy 3 Vault Credits - $0.99]</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setDebugVaultModalOpen(true)}
+            disabled={!vaultHydrated}
+            accessibilityState={{ disabled: !vaultHydrated, busy: debugActionBusy === 'resetVault' }}
+            style={({ pressed }) => [
+              styles.debugBuyBtn,
+              debugActionBusy === 'resetVault' && styles.debugBuyDimmed,
+              pressed && vaultHydrated && debugActionBusy === null && styles.debugBuyPressed,
+              !vaultHydrated && styles.debugBuyBtnDisabled,
+            ]}>
+            <Text
+              style={[styles.debugBuyText, !vaultHydrated && styles.debugBuyTextDisabled]}>
+              DEBUG [Edit Vault values]
+            </Text>
           </Pressable>
           {Platform.OS !== 'web' ? (
             <>
