@@ -5,10 +5,11 @@ import {
   runTransaction,
   serverTimestamp,
   setDoc,
+  writeBatch,
   type Unsubscribe,
 } from 'firebase/firestore';
 
-import { getFirebaseFirestore } from '@/src/firebase/firebaseApp';
+import { getFirebaseAuth, getFirebaseFirestore } from '@/src/firebase/firebaseApp';
 import {
   DEFAULT_VAULT_PROGRESS,
   FREE_MISSION_CREDIT_ALLOWANCE,
@@ -27,9 +28,80 @@ export const VAULT_RESERVE_CAP: VaultAttemptsLeft = {
 };
 
 const COLLECTION = 'userVaultProgress';
+const USERS_COLLECTION = 'users';
 
 function vaultDocRef(uid: string) {
   return doc(getFirebaseFirestore(), COLLECTION, uid);
+}
+
+function usersDocRef(uid: string) {
+  return doc(getFirebaseFirestore(), USERS_COLLECTION, uid);
+}
+
+/** Primary provider id for profile / mirror metadata (e.g. google.com). */
+function resolveAuthProviderForMirror(): string {
+  const u = getFirebaseAuth().currentUser;
+  if (!u) return 'unknown';
+  const fromList = u.providerData[0]?.providerId;
+  return fromList ?? u.providerId ?? 'unknown';
+}
+
+/**
+ * Public profile doc mirror (`users/{uid}`) — kept in sync with `userVaultProgress/{uid}`.
+ * `vault` uses product field names; canonical game state remains on userVaultProgress.
+ */
+function usersMirrorPayload(p: VaultProgress, authProvider: string): Record<string, unknown> {
+  return {
+    vault: {
+      glimpseReserves: p.attemptsLeft.glimpse,
+      stareReserves: p.attemptsLeft.stare,
+      tranceReserves: p.attemptsLeft.trance,
+      restorationProgress: p.successfulMissions,
+    },
+    lastSync: serverTimestamp(),
+    authProvider,
+  };
+}
+
+/** When only `users/{uid}.vault` exists (legacy / alternate writer), hydrate VaultProgress. */
+function vaultProgressFromUsersDocMerge(data: Record<string, unknown> | undefined): VaultProgress | null {
+  if (!data) return null;
+  const vaultRaw = data.vault;
+  if (!vaultRaw || typeof vaultRaw !== 'object' || Array.isArray(vaultRaw)) return null;
+  const v = vaultRaw as Record<string, unknown>;
+  const hasAny =
+    typeof v.glimpseReserves === 'number' ||
+    typeof v.stareReserves === 'number' ||
+    typeof v.tranceReserves === 'number' ||
+    typeof v.restorationProgress === 'number';
+  if (!hasAny) return null;
+
+  const attemptsLeft = clampAttempts({
+    glimpse: typeof v.glimpseReserves === 'number' ? v.glimpseReserves : undefined,
+    stare: typeof v.stareReserves === 'number' ? v.stareReserves : undefined,
+    trance: typeof v.tranceReserves === 'number' ? v.tranceReserves : undefined,
+  });
+  const smRaw = v.restorationProgress;
+  const successfulMissions =
+    typeof smRaw === 'number' ? Math.max(0, Math.min(10, Math.trunc(smRaw))) : 0;
+
+  return {
+    ...DEFAULT_VAULT_PROGRESS,
+    successfulMissions,
+    lifetimeMissions: DEFAULT_VAULT_PROGRESS.lifetimeMissions,
+    giftRotationIndex: DEFAULT_VAULT_PROGRESS.giftRotationIndex,
+    creditsTowardFreeMission: Math.max(0, FREE_MISSION_CREDIT_ALLOWANCE - successfulMissions),
+    attemptsLeft,
+  };
+}
+
+export async function syncUserVaultProgressAndUsersMirror(uid: string, p: VaultProgress): Promise<void> {
+  const authProvider = resolveAuthProviderForMirror();
+  const db = getFirebaseFirestore();
+  const batch = writeBatch(db);
+  batch.set(vaultDocRef(uid), toFirestorePayload(p), { merge: true });
+  batch.set(usersDocRef(uid), usersMirrorPayload(p, authProvider), { merge: true });
+  await batch.commit();
 }
 
 function clampAttempts(a: Partial<VaultAttemptsLeft> | undefined): VaultAttemptsLeft {
@@ -168,7 +240,7 @@ export async function seedVaultDocIfMissing(uid: string, seed: VaultProgress): P
   const ref = vaultDocRef(uid);
   const snap = await getDoc(ref);
   if (snap.exists()) return;
-  await setDoc(ref, toFirestorePayload(seed), { merge: true });
+  await syncUserVaultProgressAndUsersMirror(uid, seed);
 }
 
 /**
@@ -179,28 +251,43 @@ export async function fetchOrCreateVaultProgress(
   uid: string,
   seed: VaultProgress,
 ): Promise<VaultProgress> {
+  const authProvider = resolveAuthProviderForMirror();
   const ref = vaultDocRef(uid);
   const snap = await getDoc(ref);
   if (snap.exists()) {
-    return progressFromDoc(snap.data() as Record<string, unknown>);
+    const p = progressFromDoc(snap.data() as Record<string, unknown>);
+    await setDoc(usersDocRef(uid), usersMirrorPayload(p, authProvider), { merge: true });
+    return p;
+  }
+  const userSnap = await getDoc(usersDocRef(uid));
+  if (userSnap.exists()) {
+    const fromUsers = vaultProgressFromUsersDocMerge(userSnap.data() as Record<string, unknown>);
+    if (fromUsers) {
+      const merged: VaultProgress = {
+        ...fromUsers,
+        attemptsLeft: { ...fromUsers.attemptsLeft },
+      };
+      await syncUserVaultProgressAndUsersMirror(uid, merged);
+      return merged;
+    }
   }
   const seeded: VaultProgress = {
     ...seed,
     attemptsLeft: { ...seed.attemptsLeft },
     creditsTowardFreeMission: Math.max(0, FREE_MISSION_CREDIT_ALLOWANCE - seed.successfulMissions),
   };
-  await setDoc(ref, toFirestorePayload(seeded), { merge: true });
+  await syncUserVaultProgressAndUsersMirror(uid, seeded);
   return seeded;
 }
 
 /** Debug / QA: overwrite vault doc with default reserves and mission progress. */
 export async function resetVaultProgressDocToDefault(uid: string): Promise<void> {
-  await setDoc(vaultDocRef(uid), toFirestorePayload(DEFAULT_VAULT_PROGRESS), { merge: true });
+  await syncUserVaultProgressAndUsersMirror(uid, DEFAULT_VAULT_PROGRESS);
 }
 
 /** Debug / QA: write full vault state (same shape as normal sync). */
 export async function writeVaultProgressDoc(uid: string, p: VaultProgress): Promise<void> {
-  await setDoc(vaultDocRef(uid), toFirestorePayload(p), { merge: true });
+  await syncUserVaultProgressAndUsersMirror(uid, p);
 }
 
 export function subscribeVaultProgress(
@@ -211,7 +298,25 @@ export function subscribeVaultProgress(
     vaultDocRef(uid),
     (snap) => {
       if (!snap.exists()) {
-        onProgress(DEFAULT_VAULT_PROGRESS);
+        void (async () => {
+          try {
+            const userSnap = await getDoc(usersDocRef(uid));
+            if (!userSnap.exists()) {
+              onProgress(DEFAULT_VAULT_PROGRESS);
+              return;
+            }
+            const fromUsers = vaultProgressFromUsersDocMerge(
+              userSnap.data() as Record<string, unknown>,
+            );
+            if (!fromUsers) {
+              onProgress(DEFAULT_VAULT_PROGRESS);
+              return;
+            }
+            await syncUserVaultProgressAndUsersMirror(uid, fromUsers);
+          } catch {
+            onProgress(DEFAULT_VAULT_PROGRESS);
+          }
+        })();
         return;
       }
       onProgress(progressFromDoc(snap.data() as Record<string, unknown>));
@@ -233,7 +338,9 @@ export async function transactionRecordGlimpseSuccess(uid: string): Promise<{
       : DEFAULT_VAULT_PROGRESS;
 
     const { next, grantedFreeAttempt: granted } = nextProgressAfterSuccess(prev);
+    const ap = resolveAuthProviderForMirror();
     tx.set(ref, toFirestorePayload(next), { merge: true });
+    tx.set(usersDocRef(uid), usersMirrorPayload(next, ap), { merge: true });
     return granted;
   });
 
@@ -266,7 +373,9 @@ export async function transactionRecordMissionFailure(
       ? progressFromDoc(snap.data() as Record<string, unknown>)
       : DEFAULT_VAULT_PROGRESS;
     const next = nextProgressAfterTierDebit(prev, tier);
+    const ap = resolveAuthProviderForMirror();
     tx.set(ref, toFirestorePayload(next), { merge: true });
+    tx.set(usersDocRef(uid), usersMirrorPayload(next, ap), { merge: true });
   });
 }
 
@@ -287,7 +396,9 @@ export async function transactionDeductAttempt(
       ? progressFromDoc(snap.data() as Record<string, unknown>)
       : DEFAULT_VAULT_PROGRESS;
     const next = nextProgressAfterTierDebit(prev, tier);
+    const ap = resolveAuthProviderForMirror();
     tx.set(ref, toFirestorePayload(next), { merge: true });
+    tx.set(usersDocRef(uid), usersMirrorPayload(next, ap), { merge: true });
   });
 }
 
@@ -312,7 +423,9 @@ export async function transactionGrantThreeVaultCreditsForPhase(
       [tier]: prev.attemptsLeft[tier] + 3,
     };
     const next: VaultProgress = { ...prev, attemptsLeft };
+    const ap = resolveAuthProviderForMirror();
     tx.set(ref, toFirestorePayload(next), { merge: true });
+    tx.set(usersDocRef(uid), usersMirrorPayload(next, ap), { merge: true });
   });
 }
 
@@ -333,7 +446,9 @@ export async function transactionGrantMonthlyGiftRotation(uid: string): Promise<
       ? progressFromDoc(snap.data() as Record<string, unknown>)
       : DEFAULT_VAULT_PROGRESS;
     const { next, securedTier } = applyMonthlyGiftRotationClaim(prev);
+    const ap = resolveAuthProviderForMirror();
     tx.set(ref, toFirestorePayload(next), { merge: true });
+    tx.set(usersDocRef(uid), usersMirrorPayload(next, ap), { merge: true });
     return {
       securedTier,
       nextGiftRotationIndex: next.giftRotationIndex,
