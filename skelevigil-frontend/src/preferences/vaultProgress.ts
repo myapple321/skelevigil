@@ -1,5 +1,26 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
+
+/** Pre–per-UID vault; migrated once on first read for the active session. */
+const LEGACY_VAULT_STORAGE_KEY = '@skelevigil/vault-progress-v1';
+
+function currentVaultStorageKey(): string {
+  const uid = getFirebaseAuth().currentUser?.uid;
+  if (!uid) return '@skelevigil/vault-progress-v2/unsigned';
+  return `@skelevigil/vault-progress-v2/uid/${uid}`;
+}
+
+/** One-time copy from legacy global key into this account bucket, then drop legacy. */
+async function migrateLegacyVaultIfNeeded(targetKey: string): Promise<void> {
+  const existing = await AsyncStorage.getItem(targetKey);
+  if (existing) return;
+  const legacy = await AsyncStorage.getItem(LEGACY_VAULT_STORAGE_KEY);
+  if (!legacy) return;
+  await AsyncStorage.setItem(targetKey, legacy);
+  await AsyncStorage.removeItem(LEGACY_VAULT_STORAGE_KEY);
+}
+
 export type VaultAttemptsLeft = {
   glimpse: number;
   stare: number;
@@ -18,7 +39,6 @@ export type VaultProgress = {
   giftRotationIndex: number;
 };
 
-const STORAGE_KEY = '@skelevigil/vault-progress-v1';
 export const FREE_MISSION_CREDIT_ALLOWANCE = 10;
 
 export const DEFAULT_VAULT_PROGRESS: VaultProgress = {
@@ -68,7 +88,9 @@ export function normalizeVaultProgressFromDebugInput(input: {
 
 export async function getVaultProgress(): Promise<VaultProgress> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    const key = currentVaultStorageKey();
+    await migrateLegacyVaultIfNeeded(key);
+    const raw = await AsyncStorage.getItem(key);
     if (!raw) return DEFAULT_VAULT_PROGRESS;
     const parsed = JSON.parse(raw) as Partial<VaultProgress> | null;
     if (!parsed || typeof parsed !== 'object') return DEFAULT_VAULT_PROGRESS;
@@ -114,5 +136,7 @@ export async function getVaultProgress(): Promise<VaultProgress> {
 }
 
 export async function setVaultProgress(progress: VaultProgress): Promise<void> {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  const key = currentVaultStorageKey();
+  await migrateLegacyVaultIfNeeded(key);
+  await AsyncStorage.setItem(key, JSON.stringify(progress));
 }

@@ -171,6 +171,28 @@ export async function seedVaultDocIfMissing(uid: string, seed: VaultProgress): P
   await setDoc(ref, toFirestorePayload(seed), { merge: true });
 }
 
+/**
+ * Auth restore helper: fetch existing cloud progress, or initialize from local/guest progress.
+ * This is used after successful member login so users keep their guest-earned progress.
+ */
+export async function fetchOrCreateVaultProgress(
+  uid: string,
+  seed: VaultProgress,
+): Promise<VaultProgress> {
+  const ref = vaultDocRef(uid);
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    return progressFromDoc(snap.data() as Record<string, unknown>);
+  }
+  const seeded: VaultProgress = {
+    ...seed,
+    attemptsLeft: { ...seed.attemptsLeft },
+    creditsTowardFreeMission: Math.max(0, FREE_MISSION_CREDIT_ALLOWANCE - seed.successfulMissions),
+  };
+  await setDoc(ref, toFirestorePayload(seeded), { merge: true });
+  return seeded;
+}
+
 /** Debug / QA: overwrite vault doc with default reserves and mission progress. */
 export async function resetVaultProgressDocToDefault(uid: string): Promise<void> {
   await setDoc(vaultDocRef(uid), toFirestorePayload(DEFAULT_VAULT_PROGRESS), { merge: true });

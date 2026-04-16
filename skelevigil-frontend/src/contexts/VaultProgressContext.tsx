@@ -1,11 +1,10 @@
 import { FirebaseError } from 'firebase/app';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import { router } from 'expo-router';
 import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -19,8 +18,6 @@ import {
   nextProgressAfterSuccess,
   resetVaultProgressDocToDefault,
   writeVaultProgressDoc,
-  seedVaultDocIfMissing,
-  subscribeVaultProgress,
   transactionGrantThreeVaultCreditsForPhase,
   transactionDeductAttempt,
   transactionGrantMonthlyGiftRotation,
@@ -29,6 +26,7 @@ import {
 } from '@/src/firebase/vaultProgressFirestore';
 import { rescheduleMonthlyGiftFromNow } from '@/src/notifications/missionNotificationsController';
 import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
+import { useVaultSync } from '@/src/hooks/useVaultSync';
 import { resolveAuthUserForClaim } from '@/src/firebase/resolveAuthUserForClaim';
 import {
   DEFAULT_VAULT_PROGRESS,
@@ -82,57 +80,7 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
   const [monthlyGiftModalVisible, setMonthlyGiftModalVisible] = useState(false);
   const [monthlyGiftMessage, setMonthlyGiftMessage] = useState('');
 
-  useEffect(() => {
-    const auth = getFirebaseAuth();
-    let unsubFs: (() => void) | undefined;
-    let cancelled = false;
-
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
-      if (unsubFs) {
-        unsubFs();
-        unsubFs = undefined;
-      }
-
-      if (!user) {
-        setFirestoreUid(null);
-        void getVaultProgress().then((loaded) => {
-          if (cancelled) return;
-          setProgress(loaded);
-          setHydrated(true);
-        });
-        return;
-      }
-
-      setFirestoreUid(user.uid);
-      setHydrated(false);
-
-      void (async () => {
-        try {
-          const local = await getVaultProgress();
-          if (cancelled) return;
-          await seedVaultDocIfMissing(user.uid, local);
-          if (cancelled) return;
-          unsubFs = subscribeVaultProgress(user.uid, (p) => {
-            if (!cancelled) {
-              setProgress(p);
-              setHydrated(true);
-            }
-          });
-        } catch {
-          if (!cancelled) {
-            setProgress(DEFAULT_VAULT_PROGRESS);
-            setHydrated(true);
-          }
-        }
-      })();
-    });
-
-    return () => {
-      cancelled = true;
-      unsubAuth();
-      unsubFs?.();
-    };
-  }, []);
+  useVaultSync({ setProgress, setHydrated, setFirestoreUid });
 
   const updateLocalOnly = useCallback((updater: (prev: VaultProgress) => VaultProgress) => {
     setProgress((prev) => {
