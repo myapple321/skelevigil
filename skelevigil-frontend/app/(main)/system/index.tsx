@@ -80,8 +80,30 @@ function myProfileSignInSuffix(user: User | null): string {
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
-function MissionAlertsRow() {
+function MissionAlertsRow({
+  locked,
+  onPressLocked,
+}: {
+  locked: boolean;
+  onPressLocked: () => void;
+}) {
   const { missionAlertsEnabled, setMissionAlertsEnabled, hydrated } = useMissionAlert();
+  if (locked) {
+    return (
+      <Pressable onPress={onPressLocked} style={({ pressed }) => [styles.toggleRow, styles.rowLocked, pressed && styles.rowPressed]}>
+        <View style={styles.rowMain}>
+          <Ionicons name="notifications-outline" size={24} color={SV.muted} style={styles.rowIcon} />
+          <View style={styles.toggleTextBlock}>
+            <Text style={[styles.missionToggleTitle, styles.rowTitleLocked]}>Mission Alerts</Text>
+            <Text style={styles.missionToggleSub}>
+              This feature requires a Neural Link. Sign In / Sign Up to secure your progress.
+            </Text>
+          </View>
+        </View>
+        <Ionicons name="lock-closed" size={14} color={SV.muted} />
+      </Pressable>
+    );
+  }
   return (
     <View style={styles.toggleRow}>
       <View style={styles.rowMain}>
@@ -139,6 +161,7 @@ function Row({
   iconName,
   subtitle,
   valueSuffix,
+  locked,
 }: {
   title: string;
   onPress: () => void;
@@ -147,17 +170,24 @@ function Row({
   subtitle?: string;
   /** Optional inline value shown near chevron, e.g. current Lock-Screen timeout. */
   valueSuffix?: string;
+  /** Guest-only lock treatment for unavailable settings. */
+  locked?: boolean;
 }) {
   const a11yLabel = [title, subtitle, valueSuffix].filter(Boolean).join(', ');
   return (
     <Pressable
       onPress={onPress}
       accessibilityLabel={a11yLabel}
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+      style={({ pressed }) => [styles.row, locked && styles.rowLocked, pressed && styles.rowPressed]}>
       <View style={styles.rowMain}>
-        <Ionicons name={iconName} size={22} color={SV.neonCyan} style={styles.rowIcon} />
+        <Ionicons
+          name={iconName}
+          size={22}
+          color={locked ? SV.muted : SV.neonCyan}
+          style={styles.rowIcon}
+        />
         <View style={styles.rowTitleWrap}>
-          <Text style={styles.rowTitle} numberOfLines={1}>
+          <Text style={[styles.rowTitle, locked && styles.rowTitleLocked]} numberOfLines={1}>
             {title}
           </Text>
           {subtitle ? (
@@ -173,7 +203,11 @@ function Row({
             {valueSuffix}
           </Text>
         ) : null}
-        <Ionicons name="chevron-forward" size={18} color={SV.muted} />
+        {locked ? (
+          <Ionicons name="lock-closed" size={14} color={SV.muted} />
+        ) : (
+          <Ionicons name="chevron-forward" size={18} color={SV.muted} />
+        )}
       </View>
     </Pressable>
   );
@@ -194,6 +228,7 @@ export default function SystemIndexScreen() {
   } = useVaultProgress();
   const [debugPurchaseAllocOpen, setDebugPurchaseAllocOpen] = useState(false);
   const [debugVaultModalOpen, setDebugVaultModalOpen] = useState(false);
+  const [guestLockModalOpen, setGuestLockModalOpen] = useState(false);
   const [systemUser, setSystemUser] = useState<User | null>(() => getFirebaseAuth().currentUser);
 
   useEffect(() => {
@@ -211,6 +246,9 @@ export default function SystemIndexScreen() {
       Alert.alert('Sign out failed', 'Please try again.');
     }
   };
+  const openGuestLockedFeatureModal = useCallback(() => {
+    setGuestLockModalOpen(true);
+  }, []);
   const { missionAlertsEnabled, hydrated: missionAlertsHydrated } = useMissionAlert();
 
   const debugMissionAlertsReady = missionAlertsHydrated && missionAlertsEnabled;
@@ -380,6 +418,31 @@ export default function SystemIndexScreen() {
           </View>
         </Pressable>
       </Modal>
+      <Modal
+        visible={guestLockModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setGuestLockModalOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setGuestLockModalOpen(false)}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Neural Link Required</Text>
+            <Text style={styles.modalBody}>
+              This feature requires a Neural Link. Sign In / Sign Up to secure your progress.
+            </Text>
+            <Pressable
+              onPress={() => {
+                setGuestLockModalOpen(false);
+                void goToLoginFromGuest();
+              }}
+              style={({ pressed }) => [styles.signOutToContinueBtn, pressed && styles.signOutToContinueBtnPressed]}>
+              <Text style={styles.signOutToContinueText}>Sign In / Sign Up</Text>
+            </Pressable>
+            <Pressable onPress={() => setGuestLockModalOpen(false)} style={styles.modalCancelWrap}>
+              <Text style={styles.modalCancel}>Not now</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionTitle}>My Account</Text>
         <View style={styles.card}>
@@ -387,7 +450,10 @@ export default function SystemIndexScreen() {
             title="My Profile"
             iconName="person-circle-outline"
             subtitle={myProfileSignInSuffix(systemUser)}
-            onPress={() => router.push('/(main)/system/profile')}
+            locked={systemIsGuest}
+            onPress={() =>
+              systemIsGuest ? openGuestLockedFeatureModal() : router.push('/(main)/system/profile')
+            }
           />
         </View>
 
@@ -396,7 +462,12 @@ export default function SystemIndexScreen() {
           <Row
             title="Change Password"
             iconName="key-outline"
-            onPress={() => router.push('/(main)/system/change-password')}
+            locked={systemIsGuest}
+            onPress={() =>
+              systemIsGuest
+                ? openGuestLockedFeatureModal()
+                : router.push('/(main)/system/change-password')
+            }
           />
           <View style={styles.divider} />
           <Row
@@ -415,7 +486,12 @@ export default function SystemIndexScreen() {
           <Row
             title="Delete Account"
             iconName="trash-outline"
+            locked={systemIsGuest}
             onPress={() => {
+              if (systemIsGuest) {
+                openGuestLockedFeatureModal();
+                return;
+              }
               setDeleteError(null);
               setDeleteNeedsRecentSignIn(false);
               setDeleteOpen(true);
@@ -429,7 +505,10 @@ export default function SystemIndexScreen() {
           {Platform.OS !== 'web' ? (
             <>
               <View style={styles.divider} />
-              <MissionAlertsRow />
+              <MissionAlertsRow
+                locked={systemIsGuest}
+                onPressLocked={openGuestLockedFeatureModal}
+              />
             </>
           ) : null}
         </View>
@@ -603,6 +682,9 @@ const styles = StyleSheet.create({
   rowPressed: {
     backgroundColor: 'rgba(0,255,255,0.06)',
   },
+  rowLocked: {
+    opacity: 0.62,
+  },
   rowTitleWrap: {
     flex: 1,
     minWidth: 0,
@@ -611,6 +693,9 @@ const styles = StyleSheet.create({
     color: SV.surgicalWhite,
     fontSize: 16,
     fontWeight: '600',
+  },
+  rowTitleLocked: {
+    color: SV.muted,
   },
   rowSubtitle: {
     marginTop: 3,
