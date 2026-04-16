@@ -67,6 +67,17 @@ function deleteModalAccountSummary(user: User): { emailDisplay: string; methodsL
   return { emailDisplay, methodsLabel };
 }
 
+function myProfileSignInSuffix(user: User | null): string {
+  if (!user) return 'Sign-in: —';
+  if (user.isAnonymous) return 'Sign-in: Guest';
+  const labels = user.providerData
+    .map((p) => signInMethodLabel(p.providerId))
+    .filter((x): x is string => x != null);
+  const unique = [...new Set(labels)];
+  const method = unique.length > 0 ? unique.join(', ') : 'Account';
+  return `Sign-in: ${method}`;
+}
+
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function MissionAlertsRow() {
@@ -126,15 +137,18 @@ function Row({
   title,
   onPress,
   iconName,
+  subtitle,
   valueSuffix,
 }: {
   title: string;
   onPress: () => void;
   iconName: IoniconName;
+  /** Optional secondary line below title, e.g. sign-in method. */
+  subtitle?: string;
   /** Optional inline value shown near chevron, e.g. current Lock-Screen timeout. */
   valueSuffix?: string;
 }) {
-  const a11yLabel = valueSuffix ? `${title}, ${valueSuffix}` : title;
+  const a11yLabel = [title, subtitle, valueSuffix].filter(Boolean).join(', ');
   return (
     <Pressable
       onPress={onPress}
@@ -146,6 +160,11 @@ function Row({
           <Text style={styles.rowTitle} numberOfLines={1}>
             {title}
           </Text>
+          {subtitle ? (
+            <Text style={styles.rowSubtitle} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          ) : null}
         </View>
       </View>
       <View style={styles.rowTail}>
@@ -367,6 +386,7 @@ export default function SystemIndexScreen() {
           <Row
             title="My Profile"
             iconName="person-circle-outline"
+            subtitle={myProfileSignInSuffix(systemUser)}
             onPress={() => router.push('/(main)/system/profile')}
           />
         </View>
@@ -591,6 +611,12 @@ const styles = StyleSheet.create({
     color: SV.surgicalWhite,
     fontSize: 16,
     fontWeight: '600',
+  },
+  rowSubtitle: {
+    marginTop: 3,
+    color: SV.muted,
+    fontSize: 13,
+    fontWeight: '500',
   },
   rowTail: {
     flexDirection: 'row',
