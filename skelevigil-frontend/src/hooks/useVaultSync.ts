@@ -7,8 +7,10 @@ import {
   subscribeVaultProgress,
 } from '@/src/firebase/vaultProgressFirestore';
 import {
+  bootstrapGuestVaultProgress,
   DEFAULT_VAULT_PROGRESS,
   getVaultProgress,
+  hasStoredVaultProgressForCurrentUser,
   setVaultProgress,
   type VaultProgress,
 } from '@/src/preferences/vaultProgress';
@@ -21,7 +23,8 @@ type UseVaultSyncArgs = {
 
 /**
  * Login restoration:
- * - Guest / signed-out: local-only vault progress.
+ * - Signed-out: local-only vault progress.
+ * - Anonymous guest: local-only vault with one-time initial grant friction gate.
  * - Email/Apple/Google member: fetch + subscribe Firestore progress.
  * - First member login with no cloud doc: seed from local guest progress.
  */
@@ -30,7 +33,7 @@ export function useVaultSync({ setProgress, setHydrated, setFirestoreUid }: UseV
     const auth = getFirebaseAuth();
     let unsubFs: (() => void) | undefined;
     let cancelled = false;
-    let lastMode: 'guest' | 'member' | null = null;
+    let lastMode: 'signedOut' | 'guestAnonymous' | 'member' | null = null;
 
     const unsubAuth = onAuthStateChanged(auth, (user) => {
       if (unsubFs) {
@@ -38,22 +41,46 @@ export function useVaultSync({ setProgress, setHydrated, setFirestoreUid }: UseV
         unsubFs = undefined;
       }
 
-      // Guest mode is local-only, same as signed-out.
-      if (!user || user.isAnonymous) {
+      // Signed-out mode is local-only.
+      if (!user) {
         setFirestoreUid(null);
-        // Avoid repeatedly reloading stale storage while already in guest mode,
-        // which can overwrite fresh in-memory vault updates after mission events.
-        if (lastMode === 'guest') {
+        if (lastMode === 'signedOut') {
           setHydrated(true);
           return;
         }
-        lastMode = 'guest';
+        lastMode = 'signedOut';
         setHydrated(false);
         void getVaultProgress().then((loaded) => {
           if (cancelled) return;
           setProgress(loaded);
           setHydrated(true);
         });
+        return;
+      }
+      // Anonymous guest mode gets a one-time initial grant (best-effort local anti-abuse).
+      if (user.isAnonymous) {
+        setFirestoreUid(null);
+        if (lastMode === 'guestAnonymous') {
+          setHydrated(true);
+          return;
+        }
+        lastMode = 'guestAnonymous';
+        setHydrated(false);
+        void (async () => {
+          try {
+            const hasStored = await hasStoredVaultProgressForCurrentUser();
+            const loaded = hasStored
+              ? await getVaultProgress()
+              : await bootstrapGuestVaultProgress();
+            if (cancelled) return;
+            setProgress(loaded);
+            setHydrated(true);
+          } catch {
+            if (cancelled) return;
+            setProgress(DEFAULT_VAULT_PROGRESS);
+            setHydrated(true);
+          }
+        })();
         return;
       }
 

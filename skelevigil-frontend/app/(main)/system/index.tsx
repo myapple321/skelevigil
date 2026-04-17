@@ -30,6 +30,7 @@ import {
 } from '@/src/notifications/missionNotificationsController';
 import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
 import { mapAuthErrorMessage } from '@/src/firebase/mapAuthError';
+import { debugEnableOneTimeGuestGrant } from '@/src/preferences/vaultProgress';
 import { SV } from '@/src/theme/skelevigil';
 
 const DELETE_NEEDS_RECENT_SIGN_IN_MSG =
@@ -253,7 +254,7 @@ export default function SystemIndexScreen() {
 
   const debugMissionAlertsReady = missionAlertsHydrated && missionAlertsEnabled;
 
-  type DebugActionKey = 'buy' | 'resetVault' | 'reengagement' | 'monthlyGift';
+  type DebugActionKey = 'buy' | 'resetVault' | 'guestGrant' | 'reengagement' | 'monthlyGift';
   const [debugActionBusy, setDebugActionBusy] = useState<DebugActionKey | null>(null);
   const debugAsyncGateRef = useRef(false);
 
@@ -570,6 +571,26 @@ export default function SystemIndexScreen() {
               DEBUG [Edit Vault values]
             </Text>
           </Pressable>
+          {systemIsGuest ? (
+            <Pressable
+              accessibilityState={{ busy: debugActionBusy === 'guestGrant' }}
+              onPress={() =>
+                void runDebugAsync('guestGrant', async () => {
+                  await debugEnableOneTimeGuestGrant();
+                  Alert.alert(
+                    'Guest one-time grant re-enabled',
+                    'Next fresh Guest bootstrap will run trial grant logic again. Sign out and continue as Guest to retest 3/2/1 then 0/0/0 behavior.',
+                  );
+                })
+              }
+              style={({ pressed }) => [
+                styles.debugBuyBtn,
+                debugActionBusy === 'guestGrant' && styles.debugBuyDimmed,
+                pressed && debugActionBusy === null && styles.debugBuyPressed,
+              ]}>
+              <Text style={styles.debugBuyText}>DEBUG [Enable One-time Guest]</Text>
+            </Pressable>
+          ) : null}
           {Platform.OS !== 'web' ? (
             <>
               <Pressable
