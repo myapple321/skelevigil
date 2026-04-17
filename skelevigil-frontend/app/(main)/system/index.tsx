@@ -117,18 +117,15 @@ function MissionAlertsRow({
           </Text>
         </View>
       </View>
-      <View style={styles.missionSwitchWrap} accessibilityRole="none">
-        <Switch
-          accessibilityLabel="Mission Alerts"
-          value={missionAlertsEnabled}
-          disabled={!hydrated}
-          onValueChange={(v) => void setMissionAlertsEnabled(v)}
-          trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(0,255,255,0.35)' }}
-          thumbColor={missionAlertsEnabled ? SV.surgicalWhite : 'rgba(200,200,200,0.95)'}
-          ios_backgroundColor="rgba(255,255,255,0.12)"
-          style={styles.missionSwitch}
-        />
-      </View>
+      <Switch
+        accessibilityLabel="Mission Alerts"
+        value={missionAlertsEnabled}
+        disabled={!hydrated}
+        onValueChange={(v) => void setMissionAlertsEnabled(v)}
+        trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(0,255,255,0.35)' }}
+        thumbColor={missionAlertsEnabled ? SV.surgicalWhite : 'rgba(200,200,200,0.95)'}
+        ios_backgroundColor="rgba(255,255,255,0.12)"
+      />
     </View>
   );
 }
@@ -140,7 +137,7 @@ function SoundEffectsRow() {
       <View style={styles.rowMain}>
         <Ionicons name="volume-high-outline" size={22} color={SV.neonCyan} style={styles.rowIcon} />
         <View style={styles.toggleTextBlock}>
-          <Text style={styles.toggleTitle}>Sound effects</Text>
+          <Text style={styles.toggleTitle}>Sound Effects.</Text>
           <Text style={styles.toggleSub}>Short sound when a tile is revealed. Default is off.</Text>
         </View>
       </View>
@@ -150,6 +147,32 @@ function SoundEffectsRow() {
         onValueChange={(v) => void setSfxEnabled(v)}
         trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(0,255,255,0.35)' }}
         thumbColor={sfxEnabled ? SV.surgicalWhite : 'rgba(200,200,200,0.95)'}
+        ios_backgroundColor="rgba(255,255,255,0.12)"
+      />
+    </View>
+  );
+}
+
+function KeepAwakeDuringMissionsRow() {
+  const { keepAwakeDuringMissions, setKeepAwakeDuringMissions, hydrated } = useSessionSecurity();
+  return (
+    <View style={styles.toggleRow}>
+      <View style={styles.rowMain}>
+        <Ionicons name="eye-outline" size={22} color={SV.neonCyan} style={styles.rowIcon} />
+        <View style={styles.toggleTextBlock}>
+          <Text style={styles.toggleTitle}>Keep Awake during Missions</Text>
+          <Text style={styles.toggleSub}>
+            Prevent device sleep while the Vigil screen is focused.
+          </Text>
+        </View>
+      </View>
+      <Switch
+        accessibilityLabel="Keep Awake during Missions"
+        value={keepAwakeDuringMissions}
+        disabled={!hydrated}
+        onValueChange={(v) => void setKeepAwakeDuringMissions(v)}
+        trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(0,255,255,0.35)' }}
+        thumbColor={keepAwakeDuringMissions ? SV.surgicalWhite : 'rgba(200,200,200,0.95)'}
         ios_backgroundColor="rgba(255,255,255,0.12)"
       />
     </View>
@@ -215,7 +238,10 @@ function Row({
 }
 
 export default function SystemIndexScreen() {
-  const { lockScreenMinutes, hydrated: lockScreenPrefsHydrated } = useSessionSecurity();
+  const {
+    lockScreenMinutes,
+    hydrated: sessionPrefsHydrated,
+  } = useSessionSecurity();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -475,13 +501,13 @@ export default function SystemIndexScreen() {
             title="Lock-Screen"
             iconName="lock-closed-outline"
             valueSuffix={
-              lockScreenPrefsHydrated ? `${lockScreenMinutes} Minutes` : undefined
+              sessionPrefsHydrated ? `${lockScreenMinutes} Minutes` : undefined
             }
             onPress={() => router.push('/(main)/system/lock-screen')}
           />
           <Text style={styles.lockScreenSubtext}>
-            Select inactivity timeout options: 5, 10, 20, or 30 Minutes. Enabling &apos;Keep
-            Awake&apos; in settings will prevent your device from sleeping during active Missions.
+            Select secure inactivity timeout: 5, 10, 20, or 30 Minutes. This ensures your vault
+            remains protected during extended breaks.
           </Text>
           <View style={styles.divider} />
           <Row
@@ -502,6 +528,8 @@ export default function SystemIndexScreen() {
 
         <Text style={styles.sectionTitle}>Preferences</Text>
         <View style={styles.card}>
+          <KeepAwakeDuringMissionsRow />
+          <View style={styles.divider} />
           <SoundEffectsRow />
           {Platform.OS !== 'web' ? (
             <>
@@ -781,13 +809,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '500',
-  },
-  missionSwitchWrap: {
-    transform: [{ scaleX: 1.28 }, { scaleY: 1.22 }],
-    marginRight: -2,
-  },
-  missionSwitch: {
-    minWidth: 52,
   },
   divider: {
     height: 1,

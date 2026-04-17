@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useSessionSecurity } from '@/src/contexts/SessionSecurityContext';
@@ -17,20 +17,15 @@ const LOCK_SCREEN_LABEL: Record<LockScreenMinutes, string> = {
 };
 
 export default function LockScreenSettingsScreen() {
-  const {
-    lockScreenMinutes,
-    setLockScreenMinutes,
-    keepAwakeDuringMissions,
-    setKeepAwakeDuringMissions,
-    hydrated,
-  } = useSessionSecurity();
+  const { lockScreenMinutes, setLockScreenMinutes, hydrated } = useSessionSecurity();
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Lock-Screen</Text>
         <Text style={styles.subtitle}>
-          Select secure inactivity timeout and optionally keep the device awake while Vigil is active.
+          Select secure inactivity timeout. The app locks after this period without interaction to help
+          protect your vault.
         </Text>
 
         <View style={styles.card}>
@@ -64,26 +59,6 @@ export default function LockScreenSettingsScreen() {
               </View>
             );
           })}
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleBody}>
-              <Text style={styles.toggleTitle}>Keep Awake during Missions</Text>
-              <Text style={styles.toggleSub}>
-                Prevent iOS Auto-Lock only while Vigil screen is focused.
-              </Text>
-            </View>
-            <Switch
-              value={keepAwakeDuringMissions}
-              disabled={!hydrated}
-              onValueChange={(v) => void setKeepAwakeDuringMissions(v)}
-              trackColor={{ false: 'rgba(255,255,255,0.14)', true: 'rgba(0,255,255,0.35)' }}
-              thumbColor={keepAwakeDuringMissions ? SV.surgicalWhite : 'rgba(200,200,200,0.95)'}
-              ios_backgroundColor="rgba(255,255,255,0.14)"
-              accessibilityLabel="Keep awake during missions"
-            />
-          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -149,29 +124,5 @@ const styles = StyleSheet.create({
     height: 1,
     marginLeft: 16,
     backgroundColor: 'rgba(0,255,255,0.12)',
-  },
-  toggleRow: {
-    minHeight: 72,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  toggleBody: {
-    flex: 1,
-    minWidth: 0,
-    gap: 4,
-  },
-  toggleTitle: {
-    color: SV.surgicalWhite,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  toggleSub: {
-    color: SV.muted,
-    fontSize: 13,
-    lineHeight: 18,
   },
 });
