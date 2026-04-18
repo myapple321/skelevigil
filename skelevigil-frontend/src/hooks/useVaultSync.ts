@@ -2,6 +2,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { useEffect } from 'react';
 
 import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
+import { syncUserProfileMirrorFromAuth } from '@/src/firebase/userProfileMirror';
 import {
   fetchOrCreateVaultProgress,
   subscribeVaultProgress,
@@ -87,6 +88,7 @@ export function useVaultSync({ setProgress, setHydrated, setFirestoreUid }: UseV
       lastMode = 'member';
       setFirestoreUid(user.uid);
       setHydrated(false);
+      void syncUserProfileMirrorFromAuth(user.uid);
 
       void (async () => {
         try {
