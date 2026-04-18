@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import {
   Alert,
   Linking,
@@ -21,71 +21,10 @@ const SEGMENT_INACTIVE_TEXT = '#0A6B6C';
 /** Softer than `SV.neonCyan` for section subheads under bright titles (Help + FAQ). */
 const SECTION_SOFT_TEAL = '#6EC9C9';
 
+/** Lighter teal for FAQ email-sync bullet labels (Automatic Sync, etc.). */
+const FAQ_LABEL_TEAL_LIGHT = '#A8E8E6';
+
 const SUPPORT_EMAIL = 'support@veridiar.com';
-
-const FAQ_ITEMS: { question: string; answer: string }[] = [
-  {
-    question: 'Does SkeleVigil support sound effects?',
-    answer:
-      'Yes. You can enable or disable auditory feedback in the System settings. We recommend keeping them on for the full "Surgical Noir" experience, as sound cues can help with mission timing.',
-  },
-  {
-    question: 'What are Mission Alerts?',
-    answer:
-      'Mission Alerts are notifications sent to your device. They remind you of active excavations you\'ve left behind and notify you when a Monthly Gift is ready to be claimed.',
-  },
-  {
-    question: 'How can I get the Mission Gift?',
-    answer:
-      'Once a month, a Free Mission is authorized for your account. You will receive a notification on your phone; simply tap it to claim your credit. The gift rotates between your Trance, Stare, and Glimpse reserves.',
-  },
-  {
-    question: 'What are the Mission Reserves in the Vault?',
-    answer:
-      'These are your "lives" or attempts. Each time you start a New Mission, one credit is used from your reserves. If you run out, you can earn more through successful gameplay or by visiting the Purchase Method area.',
-  },
-  {
-    question: 'How does the Progress to Free Restoration work?',
-    answer:
-      'For every 10 missions you successfully complete, the Vault synchronizes and rewards you with one free attempt added to your reserves automatically.',
-  },
-  {
-    question: 'What is the "Buy 3 Vault Credits" option?',
-    answer: `This allows you to instantly add 3 attempts to your reserves for $0.99.
-
-One-time purchase: This is not a subscription. You will only be charged when you manually tap the button.
-
-Guest Users: Please note that Guest accounts are not permitted to make purchases to protect your funds. You must link a Google, Apple, or Email account first.`,
-  },
-  {
-    question: 'What is SkeleVigil Lock-Screen Option?',
-    answer: `The Lock-Screen is a dual-purpose security and power-management feature designed to protect your session while accommodating the slower, deliberate pace of neural excavation.
-
-1. The Inactivity Timer
-Unlike a full logout, the Lock-Screen puts the app into a "Secure State" after a set period of inactivity. You can select between four increments:
-5 Minutes: For high-security environments.
-10 Minutes: The standard balanced default.
-20 Minutes: For a more relaxed, uninterrupted experience.
-30 Minutes: The maximum allowable idle time.
-
-2. Keep Awake Integration
-To prevent frustration during deep-focus missions, the system includes a Keep Awake toggle.
-How it works: When enabled, it overrides the iPhone's system "Auto-Lock" (1–5 minutes).
-The Result: Your screen stays bright as long as you are on a Vigil mission, though the 30-minute internal app timer remains active as a final safety net.`,
-  },
-  {
-    question: 'What is in the System settings?',
-    answer: `Manage Profile: Update your details or change your secure password.
-
-Sound Effects: Toggle the "Vigil" audio on or off. Default is off.
-
-System Notifications: Enable or disable Mission Alerts. Default is off.
-
-Lock-Screen: Selecting inactivity timeout options: 5, 10, 20, or 30 Minutes. Enabling 'Keep Awake' in settings will prevent your device from sleeping during active Missions.
-
-Delete Account: Permanently remove your data from our servers.`,
-  },
-];
 
 function FaqAccordionItem({
   question,
@@ -94,7 +33,7 @@ function FaqAccordionItem({
   onToggle,
 }: {
   question: string;
-  answer: string;
+  answer: string | ReactNode;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -114,7 +53,13 @@ function FaqAccordionItem({
           style={styles.faqChevron}
         />
       </Pressable>
-      {expanded ? <Text style={styles.faqAnswer}>{answer}</Text> : null}
+      {expanded ? (
+        typeof answer === 'string' ? (
+          <Text style={styles.faqAnswer}>{answer}</Text>
+        ) : (
+          answer
+        )
+      ) : null}
     </View>
   );
 }
@@ -349,4 +294,147 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     paddingLeft: 2,
   },
+  faqAnswerBold: {
+    fontWeight: '800',
+    color: SECTION_SOFT_TEAL,
+  },
+  faqAnswerLabel: {
+    fontWeight: '800',
+    color: FAQ_LABEL_TEAL_LIGHT,
+  },
+  faqAnswerSubLabel: {
+    fontWeight: '800',
+    color: FAQ_LABEL_TEAL_LIGHT,
+  },
 });
+
+const FAQ_ITEMS: { question: string; answer: string | ReactNode }[] = [
+  {
+    question: 'How does SkeleVigil synchronize my email across different login methods?',
+    answer: (
+      <Text style={styles.faqAnswer}>
+        Your profile email is managed differently depending on how you choose to access your vault. This
+        ensures your progress is always tied to a verified identity.
+        {'\n\n'}
+        <Text style={styles.faqAnswerBold}>1. Social Sign-In (Apple & Google)</Text>
+        {'\n'}
+        When you use Apple or Google, SkeleVigil treats them as the &quot;Source of Truth.&quot;
+        {'\n'}
+        <Text style={styles.faqAnswerLabel}>Automatic Sync</Text>
+        {
+          ': Your profile email is automatically updated to match the one managed by your Apple or Google account.'
+        }
+        {'\n'}
+        <Text style={styles.faqAnswerLabel}>Security Lock</Text>
+        {
+          ': The email field becomes "Read-Only" (dimmed) to prevent accidental changes that could break your account link.'
+        }
+        {'\n'}
+        <Text style={styles.faqAnswerLabel}>Verification</Text>
+        {': A '}
+        <Text style={styles.faqAnswerSubLabel}>Verified Badge</Text>
+        {' will appear, signifying that your identity is secured by the provider.'}
+        {'\n\n'}
+        <Text style={styles.faqAnswerBold}>2. Standard Email Sign-In</Text>
+        {'\n'}
+        If you use a traditional email and password, you are responsible for the verification process.
+        {'\n'}
+        <Text style={styles.faqAnswerLabel}>Manual Update</Text>
+        {': You can type your preferred contact email directly into the field.'}
+        {'\n'}
+        <Text style={styles.faqAnswerLabel}>Verification Guardrail</Text>
+        {
+          ': To secure your account, you must tap this button in My Profile '
+        }
+        <Text style={styles.faqAnswerSubLabel}>&quot;Send Verification Email&quot;</Text>
+        {'.'}
+        {'\n'}
+        <Text style={styles.faqAnswerLabel}>Finalizing</Text>
+        {
+          ': Check your inbox for a confirmation link. Once clicked, return to the app; your email will then be marked as '
+        }
+        <Text style={styles.faqAnswerSubLabel}>Verified</Text>
+        {'.'}
+        {'\n\n'}
+        <Text style={styles.faqAnswerBold}>3. Guest Mode</Text>
+        {'\n'}
+        Guest mode is designed for temporary access and has restricted profile management.
+        {'\n'}
+        <Text style={styles.faqAnswerLabel}>Locked Profile</Text>
+        {
+          ': The email field is locked because no identity is currently tied to the session.'
+        }
+        {'\n'}
+        <Text style={styles.faqAnswerLabel}>Data Risk</Text>
+        {
+          ': Progress is stored only on your device. To prevent data loss, we recommend using the '
+        }
+        <Text style={styles.faqAnswerSubLabel}>&quot;Link Account&quot;</Text>
+        {
+          ' option in the Vault to convert your Guest session into a secured Apple, Google, or Email account.'
+        }
+      </Text>
+    ),
+  },
+  {
+    question: 'Does SkeleVigil support sound effects?',
+    answer:
+      'Yes. You can enable or disable auditory feedback in the System settings. We recommend keeping them on for the full "Surgical Noir" experience, as sound cues can help with mission timing.',
+  },
+  {
+    question: 'What are Mission Alerts?',
+    answer:
+      'Mission Alerts are notifications sent to your device. They remind you of active excavations you\'ve left behind and notify you when a Monthly Gift is ready to be claimed.',
+  },
+  {
+    question: 'How can I get the Mission Gift?',
+    answer:
+      'Once a month, a Free Mission is authorized for your account. You will receive a notification on your phone; simply tap it to claim your credit. The gift rotates between your Trance, Stare, and Glimpse reserves.',
+  },
+  {
+    question: 'What are the Mission Reserves in the Vault?',
+    answer:
+      'These are your "lives" or attempts. Each time you start a New Mission, one credit is used from your reserves. If you run out, you can earn more through successful gameplay or by visiting the Purchase Method area.',
+  },
+  {
+    question: 'How does the Progress to Free Restoration work?',
+    answer:
+      'For every 10 missions you successfully complete, the Vault synchronizes and rewards you with one free attempt added to your reserves automatically.',
+  },
+  {
+    question: 'What is the "Buy 3 Vault Credits" option?',
+    answer: `This allows you to instantly add 3 attempts to your reserves for $0.99.
+
+One-time purchase: This is not a subscription. You will only be charged when you manually tap the button.
+
+Guest Users: Please note that Guest accounts are not permitted to make purchases to protect your funds. You must link a Google, Apple, or Email account first.`,
+  },
+  {
+    question: 'What is SkeleVigil Lock-Screen Option?',
+    answer: `The Lock-Screen is a dual-purpose security and power-management feature designed to protect your session while accommodating the slower, deliberate pace of neural excavation.
+
+1. The Inactivity Timer
+Unlike a full logout, the Lock-Screen puts the app into a "Secure State" after a set period of inactivity. You can select between four increments:
+5 Minutes: For high-security environments.
+10 Minutes: The standard balanced default.
+20 Minutes: For a more relaxed, uninterrupted experience.
+30 Minutes: The maximum allowable idle time.
+
+2. Keep Awake Integration
+To prevent frustration during deep-focus missions, the system includes a Keep Awake toggle.
+How it works: When enabled, it overrides the iPhone's system "Auto-Lock" (1–5 minutes).
+The Result: Your screen stays bright as long as you are on a Vigil mission, though the 30-minute internal app timer remains active as a final safety net.`,
+  },
+  {
+    question: 'What is in the System settings?',
+    answer: `Manage Profile: Update your details or change your secure password.
+
+Sound Effects: Toggle the "Vigil" audio on or off. Default is off.
+
+System Notifications: Enable or disable Mission Alerts. Default is off.
+
+Lock-Screen: Selecting inactivity timeout options: 5, 10, 20, or 30 Minutes. Enabling 'Keep Awake' in settings will prevent your device from sleeping during active Missions.
+
+Delete Account: Permanently remove your data from our servers.`,
+  },
+];
