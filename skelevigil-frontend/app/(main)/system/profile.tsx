@@ -1,9 +1,15 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
-import { onAuthStateChanged, verifyBeforeUpdateEmail, type User } from 'firebase/auth';
+import {
+  onAuthStateChanged,
+  sendEmailVerification,
+  verifyBeforeUpdateEmail,
+  type User,
+} from 'firebase/auth';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -45,6 +51,7 @@ export default function MyProfileScreen() {
   const [fullName, setFullName] = useState('');
   const [emailDraft, setEmailDraft] = useState('');
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null);
+  const [verifyEmailBusy, setVerifyEmailBusy] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(getFirebaseAuth(), (u) => setAuthUser(u));
@@ -125,6 +132,24 @@ export default function MyProfileScreen() {
     }
   }, [isEditing, fullName, emailDraft, socialEmailLocked]);
 
+  const onSendVerificationEmail = useCallback(async () => {
+    const user = getFirebaseAuth().currentUser;
+    if (!user || user.isAnonymous || isEmailManagedBySocialProvider(user)) return;
+    if (user.emailVerified || !(user.email && user.email.length > 0)) return;
+    setVerifyEmailBusy(true);
+    try {
+      await sendEmailVerification(user);
+      Alert.alert(
+        'Verification sent',
+        `We emailed a link to ${user.email}. Open it to verify this address.`,
+      );
+    } catch (e) {
+      Alert.alert('Could not send email', mapAuthErrorMessage(e));
+    } finally {
+      setVerifyEmailBusy(false);
+    }
+  }, []);
+
   useLayoutEffect(() => {
     const headerLeft = () => (
       <Pressable onPress={() => router.back()} hitSlop={10}>
@@ -169,6 +194,11 @@ export default function MyProfileScreen() {
   const managedFooter = managedByLabel(authUser);
   const emailEditable = isEditing && !socialEmailLocked;
   const emailInputValue = socialEmailLocked ? displayEmail : isEditing ? emailDraft : displayEmail;
+  const showSendVerificationEmail =
+    !socialEmailLocked &&
+    !authUser.emailVerified &&
+    displayEmail.length > 0 &&
+    !pendingVerificationEmail;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -220,6 +250,24 @@ export default function MyProfileScreen() {
             <Text style={styles.hintText}>
               Check your inbox to verify this email address and secure your account.
             </Text>
+          ) : null}
+          {showSendVerificationEmail ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Send verification email"
+              disabled={verifyEmailBusy}
+              onPress={() => void onSendVerificationEmail()}
+              style={({ pressed }) => [
+                styles.verifyEmailBtn,
+                pressed && !verifyEmailBusy && styles.verifyEmailBtnPressed,
+                verifyEmailBusy && styles.verifyEmailBtnDisabled,
+              ]}>
+              {verifyEmailBusy ? (
+                <ActivityIndicator color={SV.neonCyan} />
+              ) : (
+                <Text style={styles.verifyEmailBtnText}>Send verification email</Text>
+              )}
+            </Pressable>
           ) : null}
         </View>
       </ScrollView>
@@ -330,5 +378,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '500',
+  },
+  verifyEmailBtn: {
+    marginTop: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,255,0.45)',
+    backgroundColor: 'rgba(0,255,255,0.08)',
+    minHeight: 48,
+  },
+  verifyEmailBtnPressed: {
+    opacity: 0.88,
+  },
+  verifyEmailBtnDisabled: {
+    opacity: 0.65,
+  },
+  verifyEmailBtnText: {
+    color: SV.neonCyan,
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
