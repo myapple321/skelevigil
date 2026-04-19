@@ -5,7 +5,7 @@ import {
   updatePassword,
   type User,
 } from 'firebase/auth';
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -38,6 +38,12 @@ export default function ChangePasswordScreen() {
   const canChangePassword = useMemo(() => user != null && userHasPasswordProvider(user), [user]);
 
   const emailDisplay = useMemo(() => (user ? accountEmail(user) : null), [user]);
+
+  useLayoutEffect(() => {
+    if (user && !userHasPasswordProvider(user)) {
+      router.replace('/(main)/system');
+    }
+  }, [user]);
 
   const onSubmit = async () => {
     if (!user || !canChangePassword) return;
@@ -90,13 +96,7 @@ export default function ChangePasswordScreen() {
   if (!canChangePassword) {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <Text style={styles.info}>
-            Your account does not use an email and password for SkeleVigil. You signed in with
-            Google, Apple, or another provider, so there is no password to change here. Use Log in
-            with Email only if this account has email and password enabled.
-          </Text>
-        </ScrollView>
+        <View style={styles.center} />
       </SafeAreaView>
     );
   }
@@ -166,11 +166,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     marginBottom: 16,
-  },
-  info: {
-    color: 'rgba(240,240,240,0.88)',
-    fontSize: 15,
-    lineHeight: 22,
   },
   error: {
     color: '#FF6B6B',
