@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useMissionAlert } from '@/src/contexts/MissionAlertContext';
+import { usePrivacyMasking } from '@/src/contexts/PrivacyMaskingContext';
 import { useSessionSecurity } from '@/src/contexts/SessionSecurityContext';
 import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
 import { DebugVaultValuesModal } from '@/src/components/vault/DebugVaultValuesModal';
@@ -177,6 +178,33 @@ function KeepAwakeDuringMissionsRow() {
         onValueChange={(v) => void setKeepAwakeDuringMissions(v)}
         trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(0,255,255,0.35)' }}
         thumbColor={keepAwakeDuringMissions ? SV.surgicalWhite : 'rgba(200,200,200,0.95)'}
+        ios_backgroundColor="rgba(255,255,255,0.12)"
+      />
+    </View>
+  );
+}
+
+function PrivacyMaskingRow() {
+  const { privacyMaskingEnabled, setPrivacyMaskingEnabled, hydrated } = usePrivacyMasking();
+  return (
+    <View style={styles.toggleRow}>
+      <View style={styles.rowMain}>
+        <Ionicons name="eye-off-outline" size={22} color={SV.neonCyan} style={styles.rowIcon} />
+        <View style={styles.toggleTextBlock}>
+          <Text style={styles.toggleTitle}>Privacy Masking</Text>
+          <Text style={styles.toggleSub}>
+            Obscures your email address on public-facing screens like the Vault Scoreboard to protect your
+            identity. (e.g., s****e@email.com)
+          </Text>
+        </View>
+      </View>
+      <Switch
+        accessibilityLabel="Privacy Masking"
+        value={privacyMaskingEnabled}
+        disabled={!hydrated}
+        onValueChange={(v) => void setPrivacyMaskingEnabled(v)}
+        trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(0,255,255,0.35)' }}
+        thumbColor={privacyMaskingEnabled ? SV.surgicalWhite : 'rgba(200,200,200,0.95)'}
         ios_backgroundColor="rgba(255,255,255,0.12)"
       />
     </View>
@@ -584,6 +612,8 @@ export default function SystemIndexScreen() {
               />
             </>
           ) : null}
+          <View style={styles.divider} />
+          <PrivacyMaskingRow />
         </View>
 
         <Text style={styles.sectionTitle}>Support</Text>

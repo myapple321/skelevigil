@@ -1,6 +1,7 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,10 +9,22 @@ import {
   PurchaseAllocationModal,
   type VaultPhaseTier,
 } from '@/src/components/vault/PurchaseAllocationModal';
+import { usePrivacyMasking } from '@/src/contexts/PrivacyMaskingContext';
 import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
 import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
+import { maskEmailAddress } from '@/src/privacy/maskEmail';
 import { FREE_MISSION_CREDIT_ALLOWANCE } from '@/src/preferences/vaultProgress';
 import { SV } from '@/src/theme/skelevigil';
+
+const CREDENTIAL_PEEK_MS = 4000;
+
+function credentialVariant(user: User | null): 'guest' | 'apple' | 'google' | 'email' {
+  if (!user || user.isAnonymous) return 'guest';
+  const ids = user.providerData.map((p) => p.providerId);
+  if (ids.includes('apple.com')) return 'apple';
+  if (ids.includes('google.com')) return 'google';
+  return 'email';
+}
 
 /** Same fills as Phases screen Play now buttons (`PHASE_BTN` in phases.tsx). */
 const PHASE_RESERVE_LABEL_COLOR = {
@@ -23,14 +36,59 @@ const PHASE_RESERVE_LABEL_COLOR = {
 export default function VaultScreen() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => getFirebaseAuth().currentUser);
   const { progress, hydrated } = useVaultProgress();
+  const { privacyMaskingEnabled, hydrated: privacyHydrated } = usePrivacyMasking();
   const [purchaseAllocationOpen, setPurchaseAllocationOpen] = useState(false);
+  const [peekFullCredential, setPeekFullCredential] = useState(false);
+  const peekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(getFirebaseAuth(), (user) => setCurrentUser(user));
     return unsub;
   }, []);
 
+  const clearPeekTimer = useCallback(() => {
+    if (peekTimerRef.current) {
+      clearTimeout(peekTimerRef.current);
+      peekTimerRef.current = null;
+    }
+  }, []);
+
+  const onPeekCredential = useCallback(() => {
+    setPeekFullCredential(true);
+    clearPeekTimer();
+    peekTimerRef.current = setTimeout(() => {
+      setPeekFullCredential(false);
+      peekTimerRef.current = null;
+    }, CREDENTIAL_PEEK_MS);
+  }, [clearPeekTimer]);
+
+  useEffect(() => () => clearPeekTimer(), [clearPeekTimer]);
+
   const isGuest = useMemo(() => currentUser?.isAnonymous === true, [currentUser]);
+
+  const authVariant = useMemo(() => credentialVariant(currentUser), [currentUser]);
+
+  const excavatorLine = useMemo(() => {
+    if (authVariant === 'guest') {
+      return {
+        prefix: 'Guest ID:',
+        value: 'Temporary Session',
+        showEye: false,
+      };
+    }
+    const email = currentUser?.email?.trim() ?? '';
+    const raw = email.length > 0 ? email : '—';
+    const useMask = privacyHydrated && privacyMaskingEnabled && raw !== '—';
+    const masked = raw === '—' ? '—' : maskEmailAddress(raw);
+    const visible = !useMask || peekFullCredential ? raw : masked;
+    const prefix =
+      authVariant === 'apple' ? 'Apple ID:' : authVariant === 'google' ? 'Google ID:' : 'User ID:';
+    return {
+      prefix,
+      value: visible,
+      showEye: Boolean(useMask && raw !== '—'),
+    };
+  }, [authVariant, currentUser, privacyHydrated, privacyMaskingEnabled, peekFullCredential]);
 
   const goToLoginFromGuest = async () => {
     try {
@@ -69,6 +127,40 @@ export default function VaultScreen() {
         onSelectPhase={onPurchaseAllocationSelectPhase}
       />
       <View style={styles.body}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Vault Key.</Text>
+          <View style={styles.credentialCard}>
+            <View style={styles.credentialRow}>
+              <Text style={styles.credentialPrefix}>{excavatorLine.prefix}</Text>
+              <Text
+                style={styles.credentialValue}
+                numberOfLines={3}
+                accessibilityLabel={`${excavatorLine.prefix} ${excavatorLine.value}`}>
+                {excavatorLine.value}
+              </Text>
+              {excavatorLine.showEye ? (
+                <Pressable
+                  onPress={onPeekCredential}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    peekFullCredential
+                      ? 'Full email visible; will hide shortly'
+                      : 'Reveal full email for a few seconds'
+                  }>
+                  <Ionicons
+                    name={peekFullCredential ? 'eye' : 'eye-outline'}
+                    size={22}
+                    color={SV.neonCyan}
+                  />
+                </Pressable>
+              ) : (
+                <View style={styles.credentialEyeSpacer} />
+              )}
+            </View>
+          </View>
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Vault Scoreboard</Text>
           <View style={styles.trackingBox}>
@@ -161,6 +253,38 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 10,
     textAlign: 'center',
+  },
+  credentialCard: {
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,255,0.25)',
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  credentialRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  credentialPrefix: {
+    color: SV.surgicalWhite,
+    fontSize: 14,
+    fontWeight: '700',
+    minWidth: 88,
+    paddingTop: 2,
+  },
+  credentialValue: {
+    flex: 1,
+    minWidth: 0,
+    color: 'rgba(240,240,240,0.95)',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  credentialEyeSpacer: {
+    width: 22,
+    height: 22,
   },
   restorationLabel: {
     color: SV.surgicalWhite,
