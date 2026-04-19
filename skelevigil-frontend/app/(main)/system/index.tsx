@@ -49,6 +49,10 @@ function signInMethodLabel(providerId: string): string | null {
   }
 }
 
+function userHasPasswordProvider(user: User): boolean {
+  return user.providerData.some((p) => p.providerId === 'password');
+}
+
 /** Email + linked providers shown in the delete-account warning. */
 function deleteModalAccountSummary(user: User): { emailDisplay: string; methodsLabel: string } {
   const fromProviders = user.providerData
@@ -256,6 +260,7 @@ export default function SystemIndexScreen() {
   const [debugPurchaseAllocOpen, setDebugPurchaseAllocOpen] = useState(false);
   const [debugVaultModalOpen, setDebugVaultModalOpen] = useState(false);
   const [guestLockModalOpen, setGuestLockModalOpen] = useState(false);
+  const [socialChangePasswordModalOpen, setSocialChangePasswordModalOpen] = useState(false);
   const [systemUser, setSystemUser] = useState<User | null>(() => getFirebaseAuth().currentUser);
 
   useEffect(() => {
@@ -264,6 +269,10 @@ export default function SystemIndexScreen() {
   }, []);
 
   const systemIsGuest = systemUser?.isAnonymous === true;
+  const memberUsesAppleOrGoogleOnly = Boolean(
+    systemUser && !systemUser.isAnonymous && !userHasPasswordProvider(systemUser),
+  );
+  const changePasswordLocked = systemIsGuest || memberUsesAppleOrGoogleOnly;
 
   const goToLoginFromGuest = async () => {
     try {
@@ -470,6 +479,31 @@ export default function SystemIndexScreen() {
           </View>
         </Pressable>
       </Modal>
+      <Modal
+        visible={socialChangePasswordModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSocialChangePasswordModalOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setSocialChangePasswordModalOpen(false)}>
+          <View style={styles.modalCard}>
+            <Text style={[styles.modalTitle, styles.modalTitleCenter]}>
+              Apple/Google Change Password
+            </Text>
+            <Text style={styles.modalBody}>
+              External Account Management. Your password is tied to your Apple or Google ID. To update it,
+              please manage your credentials through Apple or Google directly.
+            </Text>
+            <Pressable
+              onPress={() => setSocialChangePasswordModalOpen(false)}
+              style={({ pressed }) => [
+                styles.signOutToContinueBtn,
+                pressed && styles.signOutToContinueBtnPressed,
+              ]}>
+              <Text style={styles.signOutToContinueText}>OK</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionTitle}>My Account</Text>
         <View style={styles.card}>
@@ -489,12 +523,18 @@ export default function SystemIndexScreen() {
           <Row
             title="Change Password"
             iconName="key-outline"
-            locked={systemIsGuest}
-            onPress={() =>
-              systemIsGuest
-                ? openGuestLockedFeatureModal()
-                : router.push('/(main)/system/change-password')
-            }
+            locked={changePasswordLocked}
+            onPress={() => {
+              if (systemIsGuest) {
+                openGuestLockedFeatureModal();
+                return;
+              }
+              if (memberUsesAppleOrGoogleOnly) {
+                setSocialChangePasswordModalOpen(true);
+                return;
+              }
+              router.push('/(main)/system/change-password');
+            }}
           />
           <View style={styles.divider} />
           <Row
@@ -915,6 +955,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 10,
+  },
+  modalTitleCenter: {
+    textAlign: 'center',
+    width: '100%',
   },
   modalAccountBox: {
     marginBottom: 14,

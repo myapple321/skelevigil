@@ -377,6 +377,39 @@ const FAQ_ITEMS: { question: string; answer: string | ReactNode }[] = [
     ),
   },
   {
+    question: 'How do I change my password in SkeleVigil?',
+    answer: (
+      <Text style={styles.faqAnswer}>
+        <Text style={styles.faqAnswerLabel}>Email Users:</Text>
+        {' You can update your credentials within the '}
+        <Text style={styles.faqAnswerSubLabel}>System Change Password</Text>
+        {
+          ' section. You will be prompted to enter your current password followed by your new choice.'
+        }
+        {'\n\n'}
+        <Text style={styles.faqAnswerLabel}>Apple & Google Users:</Text>
+        {' For your security, this section is '}
+        <Text style={styles.faqAnswerSubLabel}>locked</Text>
+        {
+          '. Since your account is authenticated through a third party, your password must be managed directly through '
+        }
+        <Text style={styles.faqAnswerSubLabel}>Apple</Text>
+        {' or '}
+        <Text style={styles.faqAnswerSubLabel}>Google</Text>
+        {
+          ' security settings. If you attempt to access this section, a notification will appear reminding you of this management.'
+        }
+        {'\n\n'}
+        <Text style={styles.faqAnswerLabel}>Guest Users:</Text>
+        {' The password section is '}
+        <Text style={styles.faqAnswerSubLabel}>disabled</Text>
+        {
+          '. Guest accounts do not utilize passwords; to secure your data and enable password protection, please upgrade to a permanent Email, Apple, or Google account.'
+        }
+      </Text>
+    ),
+  },
+  {
     question: 'Does SkeleVigil support sound effects?',
     answer:
       'Yes. You can enable or disable auditory feedback in the System settings. We recommend keeping them on for the full "Surgical Noir" experience, as sound cues can help with mission timing.',
