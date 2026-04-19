@@ -355,33 +355,37 @@ export default function SystemIndexScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <DebugVaultValuesModal
-        visible={debugVaultModalOpen}
-        onRequestClose={() => setDebugVaultModalOpen(false)}
-        seedProgress={progress}
-        busy={debugActionBusy === 'resetVault'}
-        onApply={async (next) => {
-          await runDebugAsync('resetVault', () => debugApplyVaultProgress(next));
-          setDebugVaultModalOpen(false);
-        }}
-        onResetToDefaults={async () => {
-          await runDebugAsync('resetVault', () => debugResetVaultProgressToDefault());
-        }}
-      />
-      <PurchaseAllocationModal
-        visible={debugPurchaseAllocOpen}
-        onRequestClose={() => setDebugPurchaseAllocOpen(false)}
-        isGuest={systemIsGuest}
-        attemptsLeft={progress.attemptsLeft}
-        onLinkAccount={() => void goToLoginFromGuest()}
-        onSelectPhase={(tier) => {
-          setDebugPurchaseAllocOpen(false);
-          void runDebugAsync('buy', async () => {
-            await grantThreeVaultCreditsToPhase(tier);
-            Alert.alert('Vault Synchronized', 'Added 3 Mission Reserve credits to the selected phase.');
-          });
-        }}
-      />
+      {__DEV__ ? (
+        <>
+          <DebugVaultValuesModal
+            visible={debugVaultModalOpen}
+            onRequestClose={() => setDebugVaultModalOpen(false)}
+            seedProgress={progress}
+            busy={debugActionBusy === 'resetVault'}
+            onApply={async (next) => {
+              await runDebugAsync('resetVault', () => debugApplyVaultProgress(next));
+              setDebugVaultModalOpen(false);
+            }}
+            onResetToDefaults={async () => {
+              await runDebugAsync('resetVault', () => debugResetVaultProgressToDefault());
+            }}
+          />
+          <PurchaseAllocationModal
+            visible={debugPurchaseAllocOpen}
+            onRequestClose={() => setDebugPurchaseAllocOpen(false)}
+            isGuest={systemIsGuest}
+            attemptsLeft={progress.attemptsLeft}
+            onLinkAccount={() => void goToLoginFromGuest()}
+            onSelectPhase={(tier) => {
+              setDebugPurchaseAllocOpen(false);
+              void runDebugAsync('buy', async () => {
+                await grantThreeVaultCreditsToPhase(tier);
+                Alert.alert('Vault Synchronized', 'Added 3 Mission Reserve credits to the selected phase.');
+              });
+            }}
+          />
+        </>
+      ) : null}
       <Modal
         visible={deleteOpen}
         transparent
@@ -608,118 +612,120 @@ export default function SystemIndexScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.debugWrap}>
-          <View style={styles.debugDividerRow}>
-            <View style={styles.debugDividerLine} />
-            <Text style={styles.debugTitle}>DEBUG</Text>
-            <View style={styles.debugDividerLine} />
-          </View>
-          <Pressable
-            onPress={() => setDebugPurchaseAllocOpen(true)}
-            accessibilityState={{ busy: debugActionBusy === 'buy' }}
-            style={({ pressed }) => [
-              styles.debugBuyBtn,
-              debugActionBusy === 'buy' && styles.debugBuyDimmed,
-              pressed && debugActionBusy === null && styles.debugBuyPressed,
-            ]}>
-            <Text style={styles.debugBuyText}>DEBUG [Buy 3 Vault Credits - $0.99]</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setDebugVaultModalOpen(true)}
-            disabled={!vaultHydrated}
-            accessibilityState={{ disabled: !vaultHydrated, busy: debugActionBusy === 'resetVault' }}
-            style={({ pressed }) => [
-              styles.debugBuyBtn,
-              debugActionBusy === 'resetVault' && styles.debugBuyDimmed,
-              pressed && vaultHydrated && debugActionBusy === null && styles.debugBuyPressed,
-              !vaultHydrated && styles.debugBuyBtnDisabled,
-            ]}>
-            <Text
-              style={[styles.debugBuyText, !vaultHydrated && styles.debugBuyTextDisabled]}>
-              DEBUG [Edit Vault values]
-            </Text>
-          </Pressable>
-          {systemIsGuest ? (
+        {__DEV__ ? (
+          <View style={styles.debugWrap}>
+            <View style={styles.debugDividerRow}>
+              <View style={styles.debugDividerLine} />
+              <Text style={styles.debugTitle}>DEBUG</Text>
+              <View style={styles.debugDividerLine} />
+            </View>
             <Pressable
-              accessibilityState={{ busy: debugActionBusy === 'guestGrant' }}
-              onPress={() =>
-                void runDebugAsync('guestGrant', async () => {
-                  await debugEnableOneTimeGuestGrant();
-                  Alert.alert(
-                    'Guest one-time grant re-enabled',
-                    'Next fresh Guest bootstrap will run trial grant logic again. Sign out and continue as Guest to retest 3/2/1 then 0/0/0 behavior.',
-                  );
-                })
-              }
+              onPress={() => setDebugPurchaseAllocOpen(true)}
+              accessibilityState={{ busy: debugActionBusy === 'buy' }}
               style={({ pressed }) => [
                 styles.debugBuyBtn,
-                debugActionBusy === 'guestGrant' && styles.debugBuyDimmed,
+                debugActionBusy === 'buy' && styles.debugBuyDimmed,
                 pressed && debugActionBusy === null && styles.debugBuyPressed,
               ]}>
-              <Text style={styles.debugBuyText}>DEBUG [Enable One-time Guest]</Text>
+              <Text style={styles.debugBuyText}>DEBUG [Buy 3 Vault Credits - $0.99]</Text>
             </Pressable>
-          ) : null}
-          {Platform.OS !== 'web' ? (
-            <>
+            <Pressable
+              onPress={() => setDebugVaultModalOpen(true)}
+              disabled={!vaultHydrated}
+              accessibilityState={{ disabled: !vaultHydrated, busy: debugActionBusy === 'resetVault' }}
+              style={({ pressed }) => [
+                styles.debugBuyBtn,
+                debugActionBusy === 'resetVault' && styles.debugBuyDimmed,
+                pressed && vaultHydrated && debugActionBusy === null && styles.debugBuyPressed,
+                !vaultHydrated && styles.debugBuyBtnDisabled,
+              ]}>
+              <Text
+                style={[styles.debugBuyText, !vaultHydrated && styles.debugBuyTextDisabled]}>
+                DEBUG [Edit Vault values]
+              </Text>
+            </Pressable>
+            {systemIsGuest ? (
               <Pressable
-                accessibilityHint={
-                  debugMissionAlertsReady
-                    ? undefined
-                    : 'Turn on Mission Alerts in Preferences first.'
-                }
-                accessibilityState={{
-                  disabled: !debugMissionAlertsReady,
-                  busy: debugActionBusy === 'reengagement',
-                }}
+                accessibilityState={{ busy: debugActionBusy === 'guestGrant' }}
                 onPress={() =>
-                  void runDebugAsync('reengagement', () => debugScheduleReengagementInSeconds(3))
+                  void runDebugAsync('guestGrant', async () => {
+                    await debugEnableOneTimeGuestGrant();
+                    Alert.alert(
+                      'Guest one-time grant re-enabled',
+                      'Next fresh Guest bootstrap will run trial grant logic again. Sign out and continue as Guest to retest 3/2/1 then 0/0/0 behavior.',
+                    );
+                  })
                 }
-                disabled={!debugMissionAlertsReady}
                 style={({ pressed }) => [
                   styles.debugBuyBtn,
-                  debugActionBusy === 'reengagement' && styles.debugBuyDimmed,
-                  pressed && debugMissionAlertsReady && debugActionBusy === null && styles.debugBuyPressed,
-                  !debugMissionAlertsReady && styles.debugBuyBtnDisabled,
+                  debugActionBusy === 'guestGrant' && styles.debugBuyDimmed,
+                  pressed && debugActionBusy === null && styles.debugBuyPressed,
                 ]}>
-                <Text
-                  style={[
-                    styles.debugBuyText,
-                    !debugMissionAlertsReady && styles.debugBuyTextDisabled,
-                  ]}>
-                  DEBUG [Re-Engagement Notify]
-                </Text>
+                <Text style={styles.debugBuyText}>DEBUG [Enable One-time Guest]</Text>
               </Pressable>
-              <Pressable
-                accessibilityHint={
-                  debugMissionAlertsReady
-                    ? undefined
-                    : 'Turn on Mission Alerts in Preferences first.'
-                }
-                accessibilityState={{
-                  disabled: !debugMissionAlertsReady,
-                  busy: debugActionBusy === 'monthlyGift',
-                }}
-                onPress={() =>
-                  void runDebugAsync('monthlyGift', () => debugScheduleMonthlyGiftInSeconds(3))
-                }
-                disabled={!debugMissionAlertsReady}
-                style={({ pressed }) => [
-                  styles.debugBuyBtn,
-                  debugActionBusy === 'monthlyGift' && styles.debugBuyDimmed,
-                  pressed && debugMissionAlertsReady && debugActionBusy === null && styles.debugBuyPressed,
-                  !debugMissionAlertsReady && styles.debugBuyBtnDisabled,
-                ]}>
-                <Text
-                  style={[
-                    styles.debugBuyText,
-                    !debugMissionAlertsReady && styles.debugBuyTextDisabled,
+            ) : null}
+            {Platform.OS !== 'web' ? (
+              <>
+                <Pressable
+                  accessibilityHint={
+                    debugMissionAlertsReady
+                      ? undefined
+                      : 'Turn on Mission Alerts in Preferences first.'
+                  }
+                  accessibilityState={{
+                    disabled: !debugMissionAlertsReady,
+                    busy: debugActionBusy === 'reengagement',
+                  }}
+                  onPress={() =>
+                    void runDebugAsync('reengagement', () => debugScheduleReengagementInSeconds(3))
+                  }
+                  disabled={!debugMissionAlertsReady}
+                  style={({ pressed }) => [
+                    styles.debugBuyBtn,
+                    debugActionBusy === 'reengagement' && styles.debugBuyDimmed,
+                    pressed && debugMissionAlertsReady && debugActionBusy === null && styles.debugBuyPressed,
+                    !debugMissionAlertsReady && styles.debugBuyBtnDisabled,
                   ]}>
-                  DEBUG [Monthly Gift Notify]
-                </Text>
-              </Pressable>
-            </>
-          ) : null}
-        </View>
+                  <Text
+                    style={[
+                      styles.debugBuyText,
+                      !debugMissionAlertsReady && styles.debugBuyTextDisabled,
+                    ]}>
+                    DEBUG [Re-Engagement Notify]
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityHint={
+                    debugMissionAlertsReady
+                      ? undefined
+                      : 'Turn on Mission Alerts in Preferences first.'
+                  }
+                  accessibilityState={{
+                    disabled: !debugMissionAlertsReady,
+                    busy: debugActionBusy === 'monthlyGift',
+                  }}
+                  onPress={() =>
+                    void runDebugAsync('monthlyGift', () => debugScheduleMonthlyGiftInSeconds(3))
+                  }
+                  disabled={!debugMissionAlertsReady}
+                  style={({ pressed }) => [
+                    styles.debugBuyBtn,
+                    debugActionBusy === 'monthlyGift' && styles.debugBuyDimmed,
+                    pressed && debugMissionAlertsReady && debugActionBusy === null && styles.debugBuyPressed,
+                    !debugMissionAlertsReady && styles.debugBuyBtnDisabled,
+                  ]}>
+                  <Text
+                    style={[
+                      styles.debugBuyText,
+                      !debugMissionAlertsReady && styles.debugBuyTextDisabled,
+                    ]}>
+                    DEBUG [Monthly Gift Notify]
+                  </Text>
+                </Pressable>
+              </>
+            ) : null}
+          </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
