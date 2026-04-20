@@ -463,7 +463,34 @@ const FAQ_ITEMS: { question: string; answer: string | ReactNode }[] = [
   {
     question: 'What are Mission Alerts?',
     answer:
-      'Mission Alerts are notifications sent to your device. They remind you of active excavations you\'ve left behind and notify you when a Monthly Gift is ready to be claimed.',
+      'Mission Alerts are notifications sent to your device. They remind you of active excavations you\'ve left behind.',
+  },
+  {
+    question: 'What is Privacy Masking?',
+    answer: (
+      <Text style={styles.faqAnswer}>
+        Privacy Masking is a security feature that protects your identity by partially obscuring your
+        email address in high-visibility areas of the app, such as the Vault Scoreboard.
+        {'\n\n'}
+        <Text style={styles.faqAnswerLabel}>How it works</Text>
+        {
+          ': It retains the first and last characters of your ID while hiding the middle (e.g., s****e@email.com).'
+        }
+        {'\n\n'}
+        <Text style={styles.faqAnswerLabel}>Safe Sharing</Text>
+        {
+          ': This allows you to share screenshots of your rankings without exposing your full login credentials.'
+        }
+        {'\n\n'}
+        <Text style={styles.faqAnswerLabel}>Full Access</Text>
+        {
+          ': Your email remains completely visible and editable within the My Profile section for administrative purposes.'
+        }
+        {'\n\n'}
+        <Text style={styles.faqAnswerLabel}>Note</Text>
+        {': You can toggle this feature on or off at any time within your System Preferences.'}
+      </Text>
+    ),
   },
   {
     question: 'What are the Mission Reserves in the Vault?',
