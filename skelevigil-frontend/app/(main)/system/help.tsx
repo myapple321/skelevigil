@@ -410,6 +410,52 @@ const FAQ_ITEMS: { question: string; answer: string | ReactNode }[] = [
     ),
   },
   {
+    question: 'What is the SkeleVigil Lock-Screen Option?',
+    answer: (
+      <Text style={styles.faqAnswer}>
+        The Lock-Screen is a dual-purpose security and power-management feature. It protects your session
+        while accommodating the slower, deliberate pace of neural excavation by placing the app into a
+        Secure State rather than a full logout.
+        {'\n\n'}
+        The Inactivity Timer{'\n'}
+        You can select between four increments to determine when the Lock-Screen activates:{'\n\n'}
+        <Text style={styles.faqAnswerLabel}>5 Minutes</Text>
+        {': Optimized for high-security environments.'}
+        {'\n'}
+        <Text style={styles.faqAnswerLabel}>10 Minutes</Text>
+        {': The standard balanced default.'}
+        {'\n'}
+        <Text style={styles.faqAnswerLabel}>20 Minutes</Text>
+        {': For a more relaxed, uninterrupted experience.'}
+        {'\n'}
+        <Text style={styles.faqAnswerLabel}>30 Minutes</Text>
+        {': The maximum allowable idle time before the session is secured.'}
+      </Text>
+    ),
+  },
+  {
+    question: 'What is the "Keep Awake during Missions" toggle?',
+    answer: (
+      <Text style={styles.faqAnswer}>
+        To prevent frustration during deep-focus tasks, this setting ensures your device remains active
+        while a mission is in progress.
+        {'\n\n'}
+        <Text style={styles.faqAnswerLabel}>How it works</Text>
+        {
+          ': When enabled, it overrides the iPhone\'s system "Auto-Lock" settings (which often trigger after 1–5 minutes).'
+        }
+        {'\n\n'}
+        <Text style={styles.faqAnswerLabel}>The Result</Text>
+        {': Your screen stays bright for the duration of a Vigil mission.'}
+        {'\n\n'}
+        <Text style={styles.faqAnswerLabel}>Safety Net</Text>
+        {
+          ': Even with this enabled, the 30-minute internal SkeleVigil inactivity timer remains active as a final security measure.'
+        }
+      </Text>
+    ),
+  },
+  {
     question: 'Does SkeleVigil support sound effects?',
     answer:
       'Yes. You can enable or disable auditory feedback in the System settings. We recommend keeping them on for the full "Surgical Noir" experience, as sound cues can help with mission timing.',
@@ -418,11 +464,6 @@ const FAQ_ITEMS: { question: string; answer: string | ReactNode }[] = [
     question: 'What are Mission Alerts?',
     answer:
       'Mission Alerts are notifications sent to your device. They remind you of active excavations you\'ve left behind and notify you when a Monthly Gift is ready to be claimed.',
-  },
-  {
-    question: 'How can I get the Mission Gift?',
-    answer:
-      'Once a month, a Free Mission is authorized for your account. You will receive a notification on your phone; simply tap it to claim your credit. The gift rotates between your Trance, Stare, and Glimpse reserves.',
   },
   {
     question: 'What are the Mission Reserves in the Vault?',
@@ -443,20 +484,9 @@ One-time purchase: This is not a subscription. You will only be charged when you
 Guest Users: Please note that Guest accounts are not permitted to make purchases to protect your funds. You must link a Google, Apple, or Email account first.`,
   },
   {
-    question: 'What is SkeleVigil Lock-Screen Option?',
-    answer: `The Lock-Screen is a dual-purpose security and power-management feature designed to protect your session while accommodating the slower, deliberate pace of neural excavation.
-
-1. The Inactivity Timer
-Unlike a full logout, the Lock-Screen puts the app into a "Secure State" after a set period of inactivity. You can select between four increments:
-5 Minutes: For high-security environments.
-10 Minutes: The standard balanced default.
-20 Minutes: For a more relaxed, uninterrupted experience.
-30 Minutes: The maximum allowable idle time.
-
-2. Keep Awake Integration
-To prevent frustration during deep-focus missions, the system includes a Keep Awake toggle.
-How it works: When enabled, it overrides the iPhone's system "Auto-Lock" (1–5 minutes).
-The Result: Your screen stays bright as long as you are on a Vigil mission, though the 30-minute internal app timer remains active as a final safety net.`,
+    question: 'How can I get the Mission Gift?',
+    answer:
+      'Once a month, a Free Mission is authorized for your account. You will receive a notification on your phone; simply tap it to claim your credit. The gift rotates between your Trance, Stare, and Glimpse reserves.',
   },
   {
     question: 'What is in the System settings?',
