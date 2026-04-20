@@ -18,6 +18,10 @@ import {
   GLIMPSE_GRID_INSET,
   GLIMPSE_PREVIEW_SIZE,
 } from '@/src/components/game/GlimpseBlockGrid';
+import {
+  playMissionSuccessSfx,
+  preloadMissionSuccessSfx,
+} from '@/src/audio/missionSuccessSfx';
 import { playTileFailSfx } from '@/src/audio/tileFailSfx';
 import { playTileRevealSfx } from '@/src/audio/tileRevealSfx';
 import { GlimpseRevealBoard } from '@/src/components/game/GlimpseRevealBoard';
@@ -32,6 +36,7 @@ import {
   generateRandomStareNeuralBlocks,
   stareNeuralBlockToTileIndex,
 } from '@/src/game/stareNeuralBlocks';
+import { playMissionSuccessHaptics } from '@/src/haptics/missionSuccessHaptics';
 import type { VaultAttemptsLeft } from '@/src/preferences/vaultProgress';
 import { parseVigilPhaseParam, PHASE_ACCENTS } from '@/src/theme/phaseAccents';
 import { SV } from '@/src/theme/skelevigil';
@@ -280,6 +285,18 @@ export default function VigilScreen() {
     setPlaceholderRoundOpen(false);
   }, [vigilPhase]);
 
+  useEffect(() => {
+    void preloadMissionSuccessSfx();
+  }, []);
+
+  const fireMissionSuccessCelebration = useCallback(() => {
+    if (!sfxEnabled) {
+      void playMissionSuccessHaptics();
+      return;
+    }
+    void Promise.all([playMissionSuccessSfx(), playMissionSuccessHaptics()]);
+  }, [sfxEnabled]);
+
   const commitMissionSuccess = () => {
     if (outcomeCommittedRef.current) return;
     outcomeCommittedRef.current = true;
@@ -511,6 +528,7 @@ export default function VigilScreen() {
 
         if (success) {
           commitMissionSuccess();
+          fireMissionSuccessCelebration();
           const fullyRevealed = Array.from({ length: gridLen }, () => true);
           if (isGlimpse) {
             revealedRef.current = fullyRevealed;
