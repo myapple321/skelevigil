@@ -2,8 +2,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   PurchaseAllocationModal,
@@ -34,6 +34,7 @@ const PHASE_RESERVE_LABEL_COLOR = {
 } as const;
 
 export default function VaultScreen() {
+  const insets = useSafeAreaInsets();
   const [currentUser, setCurrentUser] = useState<User | null>(() => getFirebaseAuth().currentUser);
   const { progress, hydrated } = useVaultProgress();
   const { privacyMaskingEnabled, hydrated: privacyHydrated } = usePrivacyMasking();
@@ -126,7 +127,14 @@ export default function VaultScreen() {
         onLinkAccount={() => void goToLoginFromGuest()}
         onSelectPhase={onPurchaseAllocationSelectPhase}
       />
-      <View style={styles.body}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 12) + 28 },
+        ]}
+        showsVerticalScrollIndicator
+        keyboardShouldPersistTaps="handled">
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Vault Key.</Text>
           <View style={styles.credentialCard}>
@@ -228,7 +236,7 @@ export default function VaultScreen() {
             </View>
           </View>
         ) : null}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -238,8 +246,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: SV.abyss,
   },
-  body: {
+  scroll: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'flex-start',
     padding: 24,
     gap: 10,
