@@ -30,10 +30,12 @@ import { GLIMPSE_HELP_HINT, GLIMPSE_HELP_SUMMARY } from '@/src/content/glimpsePh
 import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
 import { useSessionSecurity } from '@/src/contexts/SessionSecurityContext';
 import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
-import { shuffledGlimpseGreyPalette, shuffledStareGreyPalette } from '@/src/game/glimpsePalette';
+import { shuffledGlimpseGreyPalette } from '@/src/game/glimpsePalette';
+import { shuffledStareGreyPalette } from '@/src/game/starePalette';
 import { generateRandomNeuralBlocks, neuralBlockToTileIndex } from '@/src/game/neuralBlocks';
 import {
   generateRandomStareNeuralBlocks,
+  STARE_GRID_TILE_COUNT,
   stareNeuralBlockToTileIndex,
 } from '@/src/game/stareNeuralBlocks';
 import { playMissionSuccessHaptics } from '@/src/haptics/missionSuccessHaptics';
@@ -44,7 +46,7 @@ import { SV } from '@/src/theme/skelevigil';
 const MEMORIZE_MS = 5000;
 const SCAN_MS = 2000;
 const GLIMPSE_PLAY_TIME_SEC = 25;
-/** Stare (5×10 diamond grid) mission clock — longer than Glimpse. */
+/** Stare mission clock (seconds) — longer than Glimpse; independent of tile count. */
 const STARE_PLAY_TIME_SEC = 50;
 const TIMEOUT_AMBER = '#FFBF00';
 
@@ -126,7 +128,7 @@ export default function VigilScreen() {
     Array.from({ length: 25 }, () => false),
   );
   const [stareRevealed, setStareRevealed] = useState<boolean[]>(() =>
-    Array.from({ length: 50 }, () => false),
+    Array.from({ length: STARE_GRID_TILE_COUNT }, () => false),
   );
   const revealedRef = useRef(revealed);
   const stareRevealedRef = useRef(stareRevealed);
@@ -206,7 +208,7 @@ export default function VigilScreen() {
     setFinishPulse(false);
     setAwaitingNewMissionAfterSuccess(false);
     hasBegunSortieRef.current = true;
-    const fresh = Array.from({ length: 50 }, () => false);
+    const fresh = Array.from({ length: STARE_GRID_TILE_COUNT }, () => false);
     stareRevealedRef.current = fresh;
     setStareRevealed(fresh);
   }, []);
@@ -500,7 +502,7 @@ export default function VigilScreen() {
     const neuralTileSet = isGlimpse
       ? new Set(neuralBlocks.map(neuralBlockToTileIndex))
       : stareNeuralTileSet;
-    const gridLen = isGlimpse ? 25 : 50;
+    const gridLen = isGlimpse ? 25 : STARE_GRID_TILE_COUNT;
 
     setScanProgress(0);
     const startedAt = Date.now();
@@ -889,14 +891,14 @@ export default function VigilScreen() {
               <Text style={styles.tabReturnHint} accessibilityLiveRegion="polite">
                 {placeholderRoundOpen
                   ? 'Placeholder grid — excavation gameplay will connect here in a future update.'
-                  : 'Tap New Mission to begin a sortie. The 10×5 layout is a stand-in for the vertical excavation surface.'}
+                  : 'Tap New Mission to begin a sortie. This panel is a stand-in until dual-plane Trance gameplay ships.'}
               </Text>
             )}
             <View
               style={[styles.placeholderVerticalBox, { borderColor: accent.primary }]}
               accessibilityRole="none"
-              accessibilityLabel="Placeholder excavation grid, 10 by 5">
-              <Text style={styles.placeholderGridMeta}>10 × 5</Text>
+              accessibilityLabel="Placeholder excavation grid for The Trance">
+              <Text style={styles.placeholderGridMeta}>Preview</Text>
             </View>
             <View style={styles.newGameRow}>
               <Pressable

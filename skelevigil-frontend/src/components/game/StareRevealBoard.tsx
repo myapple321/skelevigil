@@ -3,11 +3,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { SV } from '@/src/theme/skelevigil';
 
-const ROWS = 10;
+const ROWS = 7;
 const COLS = 5;
 
-/** Slightly shorter than 5/9 so Stare fits typical phone viewports with chrome below. */
-const PLAY_BOX_ASPECT_RATIO = 5 / 8.25;
+/** Width:height — 7 rows vs 5 columns keeps the diamond field shorter on phones than the old 10-row board. */
+const PLAY_BOX_ASPECT_RATIO = 5 / 7;
 const FIELD_BLACK = '#121212';
 /** Non-neural lattice fill (teal) — full grid only during play; hidden in memorize so the strand stands out. */
 const DIAMOND_CYAN = SV.neonCyan;
@@ -37,7 +37,7 @@ type Props = {
 };
 
 /**
- * Stare: 10×5 diamond lattice; play-phase covers are rotated squares matching each diamond
+ * Stare: 7×5 diamond lattice (35 tiles); play-phase covers are rotated squares matching each diamond
  * (not axis-aligned cell rectangles), so the mesh stays visually diamond-shaped.
  */
 export function StareRevealBoard({
@@ -87,7 +87,7 @@ export function StareRevealBoard({
       style={styles.playBoxOuter}
       collapsable={false}
       accessibilityRole="image"
-      accessibilityLabel="Stare excavation grid, fifty diamond tiles">
+      accessibilityLabel="Stare excavation grid, thirty-five diamond tiles">
       <View pointerEvents="none" style={[styles.playBoxFace, { borderColor }]} />
       <View style={styles.field} collapsable={false} onLayout={onFieldLayout}>
         <View style={styles.playField} pointerEvents="box-none">

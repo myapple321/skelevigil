@@ -1,18 +1,22 @@
 /**
- * Stare phase: neural strand on a **5×10** cell lattice (50 diamond tiles).
+ * Stare phase: neural strand on a **5×7** cell lattice (35 diamond tiles; 7 rows × 5 columns).
  *
  * Coordinates match Glimpse convention: `(0,0)` = bottom-left, **x** right, **y** up.
- * RN tile order matches `StareDiamondPlayBox`: row-major, row 0 = **top** → index `(9 - y) * 5 + x`.
+ * RN tile order matches `StareRevealBoard` / `StareDiamondPlayBox`: row-major, row 0 = **top**
+ * → index `(Y_MAX - y) * 5 + x`.
  */
 
 export type StareNeuralBlock = { x: number; y: number };
 
 export const STARE_NEURAL_PATH_LENGTH_MIN = 2;
-/** 50 cells on the grid; strand length capped at 45 per design. */
-export const STARE_NEURAL_PATH_LENGTH_MAX = 45;
+/** 35 cells on the grid; keep strand strictly shorter than full board. */
+export const STARE_NEURAL_PATH_LENGTH_MAX = 30;
 
 const X_MAX = 4;
-const Y_MAX = 9;
+const Y_MAX = 6;
+
+/** 5 columns × 7 screen rows of diamond tiles (matches `StareRevealBoard`). */
+export const STARE_GRID_TILE_COUNT = (X_MAX + 1) * (Y_MAX + 1);
 
 export type StareNeuralPatternKind =
   | 'L'

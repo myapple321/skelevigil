@@ -3,14 +3,11 @@ import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 
 import { SV } from '@/src/theme/skelevigil';
 
-const ROWS = 10;
+const ROWS = 7;
 const COLS = 5;
 
-/**
- * Play box width/height. Was 5/10 (height = 2×width); a slightly larger ratio shortens the box
- * so the border sits closer to the mesh with less empty band top/bottom (tune if mesh clips).
- */
-const PLAY_BOX_ASPECT_RATIO = 5 / 9;
+/** Width:height — matches 7×5 Stare board (`StareRevealBoard`); tune if mesh clips. */
+const PLAY_BOX_ASPECT_RATIO = 5 / 7;
 
 /** Reference lattice: black gutters (hairlines) between bright cyan diamonds. */
 const FIELD_BLACK = '#121212';
@@ -29,12 +26,12 @@ const STAGGER_SHIFT = '9%';
  */
 const VERT_NUDGE_DP = 38;
 /**
- * Applied as negative `marginTop` on rows 2…10 — larger value ⇒ stronger stack ⇒ less vertical gap.
+ * Applied as negative `marginTop` on rows 2…7 — larger value ⇒ stronger stack ⇒ less vertical gap.
  * Decreasing this widens row spacing (more black), not less.
  */
 const ROW_STACK_DP = 44;
 /**
- * Extra negative margin on rows 2,4,6,8 (0-based) for between-pair seams; same “larger = tighter” rule.
+ * Extra negative margin on rows 2,4,6 (0-based) for between-pair seams; same “larger = tighter” rule.
  */
 const BETWEEN_PAIRS_ROW_OVERLAP_DP = 78;
 /**
@@ -48,12 +45,12 @@ const BORDER_VERTICAL_INSET_DP = 34;
 type Props = {
   /** Stare phase chrome (outer border). */
   borderColor: string;
-  /** Tile indices (0–49, row-major top→bottom) that belong to the neural strand. */
+  /** Tile indices (0–34, row-major top→bottom) that belong to the neural strand. */
   neuralTileIndices?: ReadonlySet<number>;
 };
 
 /**
- * 10 × 5 = 50 diamonds: stagger via translateX on odd indices (1-based rows 2,4,6,8,10).
+ * 7 × 5 = 35 diamonds: stagger via translateX on odd rows (1-based rows 2,4,6).
  * Opaque cells + row overlap painted over stagger rows’ tips; cells stay transparent (mesh from face).
  */
 export function StareDiamondPlayBox({
@@ -80,7 +77,7 @@ export function StareDiamondPlayBox({
       style={styles.playBoxOuter}
       collapsable={false}
       accessibilityRole="image"
-      accessibilityLabel="Stare play grid, fifty diamond tiles, staggered rows">
+      accessibilityLabel="Stare play grid, thirty-five diamond tiles, staggered rows">
       <View
         pointerEvents="none"
         style={[styles.playBoxFace, { borderColor }]}

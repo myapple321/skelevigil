@@ -52,14 +52,14 @@ function PhaseBriefingBody({ phase }: { phase: PhaseInfoId }) {
       ) : null}
       {phase === 'stare' ? (
         <>
-          <BriefSection label="Geometry" body="5×10 Diamond Grid." />
+          <BriefSection label="Geometry" body="5×7 Diamond Grid." />
           <BriefSection
             label="Objective"
-            body="Navigate 50 complex shapes in a high-saturation environment."
+            body="Navigate 35 complex shapes in a high-saturation environment."
           />
           <BriefSection
             label="Summary"
-            body="The grid has shifted to Diamonds. With 50 units to scan, your focus must remain steady. Uncover the empty space while keeping the Hidden Path untouched."
+            body="The grid has shifted to Diamonds. With 35 units to scan, your focus must remain steady. Uncover the empty space while keeping the Hidden Path untouched."
           />
         </>
       ) : null}
@@ -111,7 +111,7 @@ const STARE_DIAMOND_ART = require('../../assets/phase-stare-diamond.png');
 /** Luminance-mapped to amber (see assets); avoids RN tintColor flattening the hex grid. */
 const TRANCE_HEXAGON_ART = require('../../assets/phase-trance-hexagon-amber.png');
 
-/** Diamond lattice preview for The Stare (matches 5×10 diamond briefing). */
+/** Diamond lattice preview for The Stare (matches 5×7 diamond briefing). */
 function StarePhasePreview() {
   return (
     <View
