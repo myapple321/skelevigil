@@ -9,7 +9,7 @@ const COLS = 5;
 /** Width:height — 7 rows vs 5 columns keeps the diamond field shorter on phones than the old 10-row board. */
 const PLAY_BOX_ASPECT_RATIO = 5 / 7;
 const FIELD_BLACK = '#121212';
-/** Non-neural lattice fill (teal) — full grid only during play; hidden in memorize so the strand stands out. */
+/** Non-neural lattice fill (teal) — play phase only; memorize matches Glimpse (strand only, no solid field). */
 const DIAMOND_CYAN = SV.neonCyan;
 const NEURAL_STRAND_BORDER_ICY = '#B8FFFF';
 const STAGGER_SHIFT = '9%';
@@ -17,8 +17,14 @@ const VERT_NUDGE_DP = 38;
 const ROW_STACK_DP = 44;
 const BETWEEN_PAIRS_ROW_OVERLAP_DP = 78;
 const DIAMOND_SIDE_FIT = 0.997;
-/** Inset of bordered face inside outer frame — large values waste vertical space above/below the teal border. */
+/** Teal frame sits inside the aspect box via vertical margin (same inset as the old absolute face). */
 const BORDER_VERTICAL_INSET_DP = 12;
+/**
+ * Padding *inside* the bordered face — rotated squares extend past their layout box; `playBoxFace` uses
+ * `overflow: 'hidden'`. Top is larger than bottom (row nudge + seam overlap pulls visuals upward).
+ */
+const FIELD_MESH_TOP_BLEED_DP = 36;
+const FIELD_MESH_BOTTOM_BLEED_DP = 26;
 /** Min gap between flex columns (pt). Avoid ~0 values — tiny `gap` breaks column widths on some RN builds. */
 const ROW_GAP = 1;
 
@@ -67,7 +73,7 @@ export function StareRevealBoard({
     excavationPressureFraction == null ? 0 : Math.min(1, Math.max(0, excavationPressureFraction));
   const pressureOpacity = pressure * 0.76;
 
-  /** Rows share geometry; update whenever any row lays out (memorize → play can change bounds). */
+  /** Rows share geometry; fixed row height avoids flex:1 equal slices + overlap leaving false gaps (Glimpse uses fixed 5×5). */
   const onRowInnerLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     if (width < 8 || height < 8) return;
@@ -88,16 +94,21 @@ export function StareRevealBoard({
       collapsable={false}
       accessibilityRole="image"
       accessibilityLabel="Stare excavation grid, thirty-five diamond tiles">
-      <View pointerEvents="none" style={[styles.playBoxFace, { borderColor }]} />
-      <View style={styles.field} collapsable={false} onLayout={onFieldLayout}>
+      <View style={[styles.playBoxFace, { borderColor }]} collapsable={false}>
+        <View style={styles.field} collapsable={false} onLayout={onFieldLayout}>
         <View style={styles.playField} pointerEvents="box-none">
+          <View collapsable={false} style={styles.meshRowsWrap}>
           {Array.from({ length: ROWS }, (_, row) => {
+            const isLastRow = row === ROWS - 1;
             const stagger = row % 2 === 1;
-            const betweenPairs = row >= 2 && row % 2 === 0;
-            const nudgeY =
+            /** Extra overlap at even row seams (was tuned for 10 rows). Last row index is odd on 10×5, even on 7×5 — skip extra pull on final row. */
+            const betweenPairs = row >= 2 && row % 2 === 0 && row < ROWS - 1;
+            const baseNudgeY =
               diamondSidePx == null
                 ? 0
                 : (row % 2 === 0 ? 1 : -1) * Math.min(VERT_NUDGE_DP, diamondSidePx * 0.55);
+            /** Last row: no downward nudge — avoids painting past the bottom inner edge. */
+            const nudgeY = isLastRow ? 0 : baseNudgeY;
             return (
               <View
                 key={row}
@@ -115,17 +126,23 @@ export function StareRevealBoard({
                     const isNeural = neuralTileIndices.has(idx);
                     const isRevealed = revealed[idx] === true;
                     const disabledAll = failedIndex != null || timedOut;
-                    /** Match Glimpse: excavating a safe tile removes cover *and* lattice fill so void shows through. */
-                    const latticeDiamondStyle = isNeural
-                      ? styles.diamondNeuralStrand
-                      : isRevealed
-                        ? styles.diamondExcavated
-                        : styles.diamondField;
+                    /**
+                     * Memorize: only `isNeural` cells render — strand style (Glimpse: path vs empty).
+                     * Play: full lattice; safe excavations use `diamondExcavated`.
+                     */
+                    const latticeDiamondStyle = showTiles
+                      ? isNeural
+                        ? styles.diamondNeuralStrand
+                        : isRevealed
+                          ? styles.diamondExcavated
+                          : styles.diamondField
+                      : styles.diamondNeuralStrand;
+                    const showLatticeDiamond =
+                      diamondSidePx != null && (showTiles || isNeural);
                     return (
                       <View key={idx} style={styles.cell}>
                         <View style={styles.diamondWrap} pointerEvents="none">
-                          {diamondSidePx != null &&
-                          (showTiles || isNeural) ? (
+                          {showLatticeDiamond ? (
                             <View
                               style={[
                                 styles.diamond,
@@ -184,6 +201,7 @@ export function StareRevealBoard({
               </View>
             );
           })}
+          </View>
           {showTiles && excavationPressureFraction != null && pressureOpacity > 0 ? (
             <View
               pointerEvents="none"
@@ -202,6 +220,7 @@ export function StareRevealBoard({
             />
           ) : null}
         </View>
+        </View>
       </View>
     </View>
   );
@@ -213,26 +232,24 @@ const styles = StyleSheet.create({
     width: '96%',
     maxWidth: 312,
     aspectRatio: PLAY_BOX_ASPECT_RATIO,
-    overflow: 'visible',
+    overflow: 'hidden',
     zIndex: 0,
   },
   playBoxFace: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: BORDER_VERTICAL_INSET_DP,
-    bottom: BORDER_VERTICAL_INSET_DP,
+    flex: 1,
+    marginVertical: BORDER_VERTICAL_INSET_DP,
     borderWidth: 3,
     borderRadius: 10,
     backgroundColor: FIELD_BLACK,
+    overflow: 'hidden',
   },
   field: {
     flex: 1,
-    zIndex: 1,
+    minHeight: 0,
     paddingLeft: '2.5%',
     paddingRight: '12%',
-    paddingTop: 0,
-    paddingBottom: 0,
+    paddingTop: FIELD_MESH_TOP_BLEED_DP,
+    paddingBottom: FIELD_MESH_BOTTOM_BLEED_DP,
     backgroundColor: 'transparent',
     overflow: 'visible',
   },
@@ -240,6 +257,15 @@ const styles = StyleSheet.create({
     flex: 1,
     position: 'relative',
     minHeight: 0,
+    overflow: 'visible',
+    justifyContent: 'flex-start',
+  },
+  /** Must fill `playField` so seven `flex:1` rows get real height (`flexGrow:0` left ~2 rows + empty band). */
+  meshRowsWrap: {
+    flex: 1,
+    alignSelf: 'stretch',
+    minHeight: 0,
+    width: '100%',
   },
   row: {
     flex: 1,
@@ -262,13 +288,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     position: 'relative',
   },
-  /** Centers the excavation cover on the same rotated square as the diamond mesh (not a full cell rectangle). */
+  /** Top-align (all rows): last-row `flex-end` caused a false “blank” band between rows 5 and 7. */
   coverDiamondSlot: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 4,
     elevation: 6,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   coverPressableFace: {
     borderRadius: 1,
@@ -277,7 +303,7 @@ const styles = StyleSheet.create({
   diamondWrap: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     overflow: 'visible',
   },
   diamond: {

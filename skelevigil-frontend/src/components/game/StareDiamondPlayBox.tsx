@@ -39,8 +39,11 @@ const BETWEEN_PAIRS_ROW_OVERLAP_DP = 78;
  * If tips clip, lower to ~0.992 before touching stack/nudge.
  */
 const DIAMOND_SIDE_FIT = 0.997;
-/** Border-only vertical inset (visual frame hug). */
+/** Teal frame inset inside the aspect outer (`margin` on `playBoxFace`). */
 const BORDER_VERTICAL_INSET_DP = 34;
+/** Inside-face bleed — match `StareRevealBoard` so phase art doesn’t clip diamond tips. */
+const FIELD_MESH_TOP_BLEED_DP = 36;
+const FIELD_MESH_BOTTOM_BLEED_DP = 26;
 
 type Props = {
   /** Stare phase chrome (outer border). */
@@ -78,19 +81,17 @@ export function StareDiamondPlayBox({
       collapsable={false}
       accessibilityRole="image"
       accessibilityLabel="Stare play grid, thirty-five diamond tiles, staggered rows">
-      <View
-        pointerEvents="none"
-        style={[styles.playBoxFace, { borderColor }]}
-      />
-      <View style={styles.field} collapsable={false}>
+      <View style={[styles.playBoxFace, { borderColor }]} collapsable={false}>
+        <View style={styles.field} collapsable={false}>
         {Array.from({ length: ROWS }, (_, row) => {
           const stagger = row % 2 === 1;
-          const betweenPairs = row >= 2 && row % 2 === 0;
-          const nudgeY =
+          const betweenPairs = row >= 2 && row % 2 === 0 && row < ROWS - 1;
+          const baseNudgeY =
             diamondSidePx == null
               ? 0
               : (row % 2 === 0 ? 1 : -1) *
                   Math.min(VERT_NUDGE_DP, diamondSidePx * 0.55);
+          const nudgeY = row === ROWS - 1 ? 0 : baseNudgeY;
           return (
             <View
               key={row}
@@ -139,6 +140,7 @@ export function StareDiamondPlayBox({
             </View>
           );
         })}
+        </View>
       </View>
     </View>
   );
@@ -153,30 +155,28 @@ const styles = StyleSheet.create({
     width: '96%',
     maxWidth: 312,
     aspectRatio: PLAY_BOX_ASPECT_RATIO,
-    overflow: 'visible',
+    overflow: 'hidden',
     zIndex: 0,
   },
   playBoxFace: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: BORDER_VERTICAL_INSET_DP,
-    bottom: BORDER_VERTICAL_INSET_DP,
+    flex: 1,
+    marginVertical: BORDER_VERTICAL_INSET_DP,
     borderWidth: 3,
     borderRadius: 10,
     backgroundColor: FIELD_BLACK,
+    overflow: 'hidden',
   },
   field: {
     flex: 1,
-    zIndex: 1,
+    minHeight: 0,
     paddingLeft: '2.5%',
     /**
      * Inset for stagger (`translateX` on odd rows). Was ~22% and left a wide empty band at right;
      * ~12% is usually enough vs 9% shift + rotated corners — raise if the 5th diamond clips.
      */
     paddingRight: '12%',
-    paddingTop: 0,
-    paddingBottom: 0,
+    paddingTop: FIELD_MESH_TOP_BLEED_DP,
+    paddingBottom: FIELD_MESH_BOTTOM_BLEED_DP,
     backgroundColor: 'transparent',
     overflow: 'visible',
   },
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   diamondWrap: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     overflow: 'visible',
   },
   diamond: {
