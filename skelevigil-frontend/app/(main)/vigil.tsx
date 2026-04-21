@@ -46,8 +46,8 @@ import { SV } from '@/src/theme/skelevigil';
 const MEMORIZE_MS = 5000;
 const SCAN_MS = 2000;
 const GLIMPSE_PLAY_TIME_SEC = 25;
-/** Stare mission clock (seconds) — longer than Glimpse; independent of tile count. */
-const STARE_PLAY_TIME_SEC = 50;
+/** Stare mission clock (seconds) — matches 7×5 (35-tile) board; longer than Glimpse. */
+const STARE_PLAY_TIME_SEC = 35;
 const TIMEOUT_AMBER = '#FFBF00';
 
 /**
