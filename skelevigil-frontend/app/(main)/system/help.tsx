@@ -516,6 +516,33 @@ Guest Users: Please note that Guest accounts are not permitted to make purchases
       'Once a month, a Free Mission is authorized for your account. You will receive a notification on your phone; simply tap it to claim your credit. The gift rotates between your Trance, Stare, and Glimpse reserves.',
   },
   {
+    question: 'What is the notification message for the Monthly Free Mission?',
+    answer: (
+      <Text style={styles.faqAnswer}>
+        Mission Alerts use the title{' '}
+        <Text style={styles.faqAnswerLabel}>SkeleVigil</Text>
+        {
+          '. The notification body depends on which phase is next in the monthly gift rotation (Trance, then Stare, then Glimpse).'
+        }
+        {'\n\n'}
+        <Text style={styles.faqAnswerLabel}>Trance (next grant)</Text>
+        {
+          ': Access Authorized: A free Trance mission has been added to your Vault. Secure the dual-planes now.'
+        }
+        {'\n\n'}
+        <Text style={styles.faqAnswerLabel}>Stare (next grant)</Text>
+        {
+          ': Vault Sync: You have earned one free Stare restoration. The diamonds await.'
+        }
+        {'\n\n'}
+        <Text style={styles.faqAnswerLabel}>Glimpse (next grant)</Text>
+        {
+          ': Mission Gift: Your Glimpse reserves have been replenished. Tap here to start.'
+        }
+      </Text>
+    ),
+  },
+  {
     question: 'What is in the System settings?',
     answer: `Manage Profile: Update your details or change your secure password.
 
