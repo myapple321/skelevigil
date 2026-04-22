@@ -5,6 +5,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -35,6 +36,13 @@ import {
   type VaultAttemptsLeft,
   type VaultProgress,
 } from '@/src/preferences/vaultProgress';
+import {
+  DEFAULT_VAULT_METRICS,
+  getVaultMetrics,
+  nextVaultMetricsAfterMission,
+  setVaultMetrics,
+  type VaultMetrics,
+} from '@/src/preferences/vaultMetrics';
 import { SV } from '@/src/theme/skelevigil';
 
 const REWARD_TITLE = 'Vault Sync Complete!';
@@ -55,12 +63,15 @@ function alertVaultFirestoreError(e: unknown, context: 'save' | 'update') {
 
 type VaultProgressContextValue = {
   progress: VaultProgress;
+  metrics: VaultMetrics;
   hydrated: boolean;
+  metricsHydrated: boolean;
   /** Debug: reset reserves, free-restoration progress, lifetime missions, and gift index to defaults. */
   debugResetVaultProgressToDefault: () => Promise<void>;
   /** Debug: set full vault state (Firestore or local + monthly gift reschedule). */
   debugApplyVaultProgress: (next: VaultProgress) => Promise<void>;
   recordGlimpseSuccess: () => void;
+  recordMissionSuccess: (tier: keyof VaultAttemptsLeft) => void;
   recordGlimpseFailure: () => void;
   recordMissionFailure: (tier: keyof VaultAttemptsLeft) => void;
   deductGlimpseAttempt: () => void;
@@ -74,13 +85,28 @@ const VaultProgressContext = createContext<VaultProgressContextValue | null>(nul
 
 export function VaultProgressProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState<VaultProgress>(DEFAULT_VAULT_PROGRESS);
+  const [metrics, setMetrics] = useState<VaultMetrics>(DEFAULT_VAULT_METRICS);
   const [hydrated, setHydrated] = useState(false);
+  const [metricsHydrated, setMetricsHydrated] = useState(false);
   const [firestoreUid, setFirestoreUid] = useState<string | null>(null);
   const [rewardModalVisible, setRewardModalVisible] = useState(false);
   const [monthlyGiftModalVisible, setMonthlyGiftModalVisible] = useState(false);
   const [monthlyGiftMessage, setMonthlyGiftMessage] = useState('');
 
   useVaultSync({ setProgress, setHydrated, setFirestoreUid });
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const saved = await getVaultMetrics();
+      if (cancelled) return;
+      setMetrics(saved);
+      setMetricsHydrated(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [firestoreUid]);
 
   const updateLocalOnly = useCallback((updater: (prev: VaultProgress) => VaultProgress) => {
     setProgress((prev) => {
@@ -90,31 +116,79 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const recordGlimpseSuccess = useCallback(() => {
-    if (firestoreUid) {
-      void (async () => {
-        try {
-          const { grantedFreeAttempt } = await transactionRecordGlimpseSuccess(firestoreUid);
-          if (grantedFreeAttempt) setRewardModalVisible(true);
-        } catch (err) {
-          alertVaultFirestoreError(err, 'save');
-        }
-      })();
-      return;
-    }
-
-    setProgress((prev) => {
-      const { next, grantedFreeAttempt } = nextProgressAfterSuccess(prev);
-      if (grantedFreeAttempt) {
-        queueMicrotask(() => setRewardModalVisible(true));
-      }
-      void setVaultProgress(next);
+  const updateMetricsOnly = useCallback((updater: (prev: VaultMetrics) => VaultMetrics) => {
+    setMetrics((prev) => {
+      const next = updater(prev);
+      void setVaultMetrics(next);
       return next;
     });
-  }, [firestoreUid]);
+  }, []);
+
+  useEffect(() => {
+    if (!metricsHydrated) return;
+    if (metrics.totalAttempts > 0) return;
+    if (progress.lifetimeMissions <= 0) return;
+    updateMetricsOnly((prev) => {
+      if (prev.totalAttempts > 0) return prev;
+      const seededSuccesses = Math.max(0, Math.trunc(progress.lifetimeMissions));
+      return {
+        ...prev,
+        totalAttempts: seededSuccesses,
+        totalSuccesses: seededSuccesses,
+        currentStreak: 0,
+        bestStreak: Math.max(prev.bestStreak, 0),
+        phase: {
+          ...prev.phase,
+          // Historical success events were previously recorded through Glimpse-only API.
+          glimpse: {
+            ...prev.phase.glimpse,
+            attempts: Math.max(prev.phase.glimpse.attempts, seededSuccesses),
+            successes: Math.max(prev.phase.glimpse.successes, seededSuccesses),
+          },
+        },
+      };
+    });
+  }, [
+    metricsHydrated,
+    metrics.totalAttempts,
+    progress.lifetimeMissions,
+    updateMetricsOnly,
+  ]);
+
+  const recordMissionSuccess = useCallback(
+    (tier: keyof VaultAttemptsLeft) => {
+      updateMetricsOnly((prev) => nextVaultMetricsAfterMission(prev, tier, true));
+      if (firestoreUid) {
+        void (async () => {
+          try {
+            const { grantedFreeAttempt } = await transactionRecordGlimpseSuccess(firestoreUid);
+            if (grantedFreeAttempt) setRewardModalVisible(true);
+          } catch (err) {
+            alertVaultFirestoreError(err, 'save');
+          }
+        })();
+        return;
+      }
+
+      setProgress((prev) => {
+        const { next, grantedFreeAttempt } = nextProgressAfterSuccess(prev);
+        if (grantedFreeAttempt) {
+          queueMicrotask(() => setRewardModalVisible(true));
+        }
+        void setVaultProgress(next);
+        return next;
+      });
+    },
+    [firestoreUid, updateMetricsOnly],
+  );
+
+  const recordGlimpseSuccess = useCallback(() => {
+    recordMissionSuccess('glimpse');
+  }, [recordMissionSuccess]);
 
   const recordMissionFailure = useCallback(
     (tier: keyof VaultAttemptsLeft) => {
+      updateMetricsOnly((prev) => nextVaultMetricsAfterMission(prev, tier, false));
       if (firestoreUid) {
         void (async () => {
           try {
@@ -134,7 +208,7 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
         },
       }));
     },
-    [firestoreUid, updateLocalOnly],
+    [firestoreUid, updateLocalOnly, updateMetricsOnly],
   );
 
   const recordGlimpseFailure = useCallback(
@@ -303,10 +377,13 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       progress,
+      metrics,
       hydrated,
+      metricsHydrated,
       debugResetVaultProgressToDefault,
       debugApplyVaultProgress,
       recordGlimpseSuccess,
+      recordMissionSuccess,
       recordGlimpseFailure,
       recordMissionFailure,
       deductGlimpseAttempt,
@@ -316,10 +393,13 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
     }),
     [
       progress,
+      metrics,
       hydrated,
+      metricsHydrated,
       debugResetVaultProgressToDefault,
       debugApplyVaultProgress,
       recordGlimpseSuccess,
+      recordMissionSuccess,
       recordGlimpseFailure,
       recordMissionFailure,
       deductGlimpseAttempt,

@@ -81,7 +81,7 @@ export default function VigilScreen() {
   const { keepAwakeDuringMissions } = useSessionSecurity();
   const {
     progress,
-    recordGlimpseSuccess,
+    recordMissionSuccess,
     recordMissionFailure,
     deductVaultAttempt,
   } = useVaultProgress();
@@ -304,7 +304,7 @@ export default function VigilScreen() {
     outcomeCommittedRef.current = true;
     paidForCurrentRoundRef.current = false;
     setHasActiveRound(false);
-    recordGlimpseSuccess();
+    recordMissionSuccess(vaultTier);
   };
 
   const commitMissionFailure = () => {

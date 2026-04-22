@@ -24,6 +24,7 @@ import { getFirebaseAuth } from '@/src/firebase/firebaseApp';
 import { maskEmailAddress } from '@/src/privacy/maskEmail';
 import { getMonthlyGiftNextFireAtMs } from '@/src/preferences/missionMonthlySchedule';
 import { FREE_MISSION_CREDIT_ALLOWANCE } from '@/src/preferences/vaultProgress';
+import { calcEfficiencyScore, calcRatePercent } from '@/src/preferences/vaultMetrics';
 import { SV } from '@/src/theme/skelevigil';
 
 const CREDENTIAL_PEEK_MS = 4000;
@@ -46,13 +47,41 @@ const PHASE_RESERVE_LABEL_COLOR = {
   tranceLightOrange: '#F5BF8A',
 } as const;
 
+type MetricsModalId = 'performance' | 'streak';
+type HapticMethod = 'selection';
+type HapticModule = {
+  trigger: (
+    method: HapticMethod,
+    options: { enableVibrateFallback: boolean; ignoreAndroidSystemSettings: boolean },
+  ) => void;
+};
+const HAPTIC_OPTIONS = {
+  enableVibrateFallback: true,
+  ignoreAndroidSystemSettings: false,
+} as const;
+
+let cachedHapticModule: HapticModule | null = null;
+function triggerSelectionHaptic(): void {
+  try {
+    if (!cachedHapticModule) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mod = require('react-native-haptic-feedback') as { default?: HapticModule } | HapticModule;
+      cachedHapticModule = ('default' in mod ? mod.default : mod) ?? null;
+    }
+    cachedHapticModule?.trigger('selection', HAPTIC_OPTIONS);
+  } catch {
+    // best effort
+  }
+}
+
 export default function VaultScreen() {
   const insets = useSafeAreaInsets();
   const [currentUser, setCurrentUser] = useState<User | null>(() => getFirebaseAuth().currentUser);
-  const { progress, hydrated } = useVaultProgress();
+  const { progress, metrics, hydrated, metricsHydrated } = useVaultProgress();
   const { privacyMaskingEnabled, hydrated: privacyHydrated } = usePrivacyMasking();
   const [purchaseAllocationOpen, setPurchaseAllocationOpen] = useState(false);
   const [weeklyAdModalOpen, setWeeklyAdModalOpen] = useState(false);
+  const [metricsModalOpen, setMetricsModalOpen] = useState<MetricsModalId | null>(null);
   const [monthlyNextFireMs, setMonthlyNextFireMs] = useState<number | null>(null);
   const [peekFullCredential, setPeekFullCredential] = useState(false);
   const peekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -158,11 +187,115 @@ export default function VaultScreen() {
     return Math.min(1, 1 - Math.min(1, msLeft / MONTHLY_WINDOW_MS));
   }, [monthlyNextFireMs]);
 
+  const phaseRates = useMemo(
+    () => ({
+      glimpse: calcRatePercent(metrics.phase.glimpse.successes, metrics.phase.glimpse.attempts),
+      stare: calcRatePercent(metrics.phase.stare.successes, metrics.phase.stare.attempts),
+      trance: calcRatePercent(metrics.phase.trance.successes, metrics.phase.trance.attempts),
+    }),
+    [metrics],
+  );
+
+  const successRate = useMemo(
+    () => calcRatePercent(metrics.totalSuccesses, metrics.totalAttempts),
+    [metrics.totalAttempts, metrics.totalSuccesses],
+  );
+  const efficiencyScore = useMemo(() => calcEfficiencyScore(metrics), [metrics]);
+  const phaseMastery = useMemo(() => {
+    const entries = [
+      { tier: 'glimpse' as const, wins: metrics.currentStreakPhaseWins.glimpse },
+      { tier: 'stare' as const, wins: metrics.currentStreakPhaseWins.stare },
+      { tier: 'trance' as const, wins: metrics.currentStreakPhaseWins.trance },
+    ];
+    const top = entries.reduce((a, b) => (b.wins > a.wins ? b : a), entries[0]!);
+    if (metrics.currentStreak <= 0 || top.wins <= 0) return 'No active chain yet.';
+    return `${top.tier[0]!.toUpperCase()}${top.tier.slice(1)} (${top.wins} wins in current streak)`;
+  }, [metrics.currentStreak, metrics.currentStreakPhaseWins]);
+  const vigilanceStatus =
+    metrics.currentStreak === 0
+      ? 'Chain Severed. Start a new mission to begin restoration.'
+      : metrics.currentStreak >= 5
+        ? 'High Synchronization. The chain remains intact.'
+        : 'Chain active. Keep restoring without interruption.';
+
+  const onOpenMetricsModal = useCallback((id: MetricsModalId) => {
+    triggerSelectionHaptic();
+    setMetricsModalOpen(id);
+  }, []);
+
   /** Placeholder until weekly ad + cooldown are persisted (7-day window for bar). */
   const weeklyAdProgressFraction = 4 / 7;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <Modal
+        visible={metricsModalOpen != null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMetricsModalOpen(null)}>
+        <Pressable style={styles.weeklyModalBackdrop} onPress={() => setMetricsModalOpen(null)}>
+          <Pressable style={styles.metricsModalCard} onPress={(e) => e.stopPropagation()}>
+            {metricsModalOpen === 'performance' ? (
+              <>
+                <Text style={styles.metricsModalTitle}>Performance Summary</Text>
+                <Text style={styles.metricsLine}>
+                  Success Rate: <Text style={styles.metricsStrong}>{successRate}%</Text>
+                </Text>
+                <Text style={styles.metricsLine}>
+                  Mission Volume:{' '}
+                  <Text style={styles.metricsStrong}>{metrics.totalAttempts}</Text>
+                </Text>
+                <Text style={styles.metricsLine}>
+                  Efficiency Score:{' '}
+                  <Text style={styles.metricsStrong}>{efficiencyScore}</Text>
+                </Text>
+                <Text style={[styles.metricsLine, styles.metricsSectionHeader]}>Phase Breakdown</Text>
+                {(['glimpse', 'stare', 'trance'] as const).map((tier) => {
+                  const rate = phaseRates[tier];
+                  const toneStyle =
+                    rate >= 80
+                      ? styles.metricRateStrong
+                      : rate < 50
+                        ? styles.metricRateWarning
+                        : styles.metricRateNeutral;
+                  const phaseLabel = `${tier[0]!.toUpperCase()}${tier.slice(1)}`;
+                  return (
+                    <View key={tier} style={styles.phaseMetricRow}>
+                      <Text style={styles.phaseMetricLabel}>
+                        {phaseLabel}: <Text style={toneStyle}>{rate}%</Text>
+                      </Text>
+                      <View style={styles.phaseMetricTrack}>
+                        <View style={[styles.phaseMetricFill, { width: `${rate}%` }]} />
+                      </View>
+                    </View>
+                  );
+                })}
+              </>
+            ) : (
+              <>
+                <Text style={styles.metricsModalTitle}>Streak Tracker</Text>
+                <Text style={styles.metricsLine}>
+                  Active Streak:{' '}
+                  <Text style={styles.metricsStrong}>{metrics.currentStreak}</Text>
+                </Text>
+                <Text style={styles.metricsLine}>
+                  Best Streak: <Text style={styles.metricsStrong}>{metrics.bestStreak}</Text>
+                </Text>
+                <Text style={styles.metricsLine}>
+                  Phase Mastery: <Text style={styles.metricsStrong}>{phaseMastery}</Text>
+                </Text>
+                <Text style={[styles.metricsLine, styles.metricsSectionHeader]}>Vigilance Status</Text>
+                <Text style={styles.metricsHint}>{vigilanceStatus}</Text>
+              </>
+            )}
+            <Pressable
+              onPress={() => setMetricsModalOpen(null)}
+              style={({ pressed }) => [styles.weeklyModalOk, pressed && styles.weeklyModalOkPressed]}>
+              <Text style={styles.weeklyModalOkText}>Close</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
       <Modal
         visible={weeklyAdModalOpen}
         transparent
@@ -275,6 +408,31 @@ export default function VaultScreen() {
             </Text>
           </View>
           {!hydrated ? <Text style={styles.syncHint}>Syncing vault progress...</Text> : null}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Vault Metrics</Text>
+          <View style={styles.metricsCardRow}>
+            <Pressable
+              onPress={() => onOpenMetricsModal('performance')}
+              style={({ pressed }) => [styles.metricsCard, pressed && styles.metricsCardPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Performance metrics, tap for detailed analytics">
+              <Ionicons name="bar-chart-outline" size={18} color={SV.neonCyan} />
+              <Text style={styles.metricsCardTitle}>Performance</Text>
+              <Text style={styles.metricsCardHint}>Tap for detailed analytics.</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => onOpenMetricsModal('streak')}
+              style={({ pressed }) => [styles.metricsCard, pressed && styles.metricsCardPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Streak tracker, tap for streak history">
+              <Ionicons name="flame-outline" size={18} color={SV.neonCyan} />
+              <Text style={styles.metricsCardTitle}>Streak Tracker</Text>
+              <Text style={styles.metricsCardHint}>Tap for streak history.</Text>
+            </Pressable>
+          </View>
+          {!metricsHydrated ? <Text style={styles.syncHint}>Syncing vault metrics...</Text> : null}
         </View>
 
         <View style={[styles.section, styles.restorationSection]}>
@@ -506,6 +664,113 @@ const styles = StyleSheet.create({
     color: SV.muted,
     fontSize: 12,
     textAlign: 'center',
+  },
+  metricsCardRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  metricsCard: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,255,0.28)',
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    minHeight: 92,
+    justifyContent: 'center',
+  },
+  metricsCardPressed: {
+    opacity: 0.9,
+    backgroundColor: 'rgba(0,255,255,0.06)',
+  },
+  metricsCardTitle: {
+    marginTop: 6,
+    color: SV.surgicalWhite,
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  metricsCardHint: {
+    marginTop: 4,
+    color: SV.muted,
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 15,
+  },
+  metricsModalCard: {
+    backgroundColor: SV.gunmetal,
+    borderRadius: 12,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,255,0.3)',
+    width: '100%',
+    maxWidth: 360,
+  },
+  metricsModalTitle: {
+    color: SV.neonCyan,
+    fontSize: 17,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  metricsLine: {
+    color: SV.surgicalWhite,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  metricsStrong: {
+    color: SV.surgicalWhite,
+    fontWeight: '800',
+  },
+  metricsSectionHeader: {
+    marginTop: 8,
+    color: SV.neonCyan,
+    fontWeight: '700',
+  },
+  metricsHint: {
+    marginTop: 2,
+    color: 'rgba(240,240,240,0.92)',
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  phaseMetricRow: {
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  phaseMetricLabel: {
+    color: SV.surgicalWhite,
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  metricRateStrong: {
+    color: SV.neonCyan,
+    fontWeight: '800',
+  },
+  metricRateWarning: {
+    color: '#D9A57A',
+    fontWeight: '800',
+  },
+  metricRateNeutral: {
+    color: 'rgba(240,240,240,0.92)',
+    fontWeight: '700',
+  },
+  phaseMetricTrack: {
+    width: '100%',
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: 'rgba(0,255,255,0.1)',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,255,0.22)',
+  },
+  phaseMetricFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: SV.neonCyan,
   },
   restorationSection: {
     alignItems: 'stretch',
