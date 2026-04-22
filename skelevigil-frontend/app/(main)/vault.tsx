@@ -247,10 +247,12 @@ export default function VaultScreen() {
             </Text>
           </View>
           <View style={[styles.trackingBox, styles.restorationBox]}>
-            <Text style={styles.restorationLabel}>Progress to Free Restoration</Text>
-            <Text style={styles.restorationCount} accessibilityLabel="Progress to free restoration">
-              {progress.successfulMissions} / {FREE_MISSION_CREDIT_ALLOWANCE}
-            </Text>
+            <View style={styles.restorationHeaderRow}>
+              <Text style={styles.restorationLabel}>Progress to Free Restoration</Text>
+              <Text style={styles.restorationCount} accessibilityLabel="Progress to free restoration">
+                {progress.successfulMissions} / {FREE_MISSION_CREDIT_ALLOWANCE}
+              </Text>
+            </View>
             <View
               style={styles.progressTrack}
               accessibilityRole="progressbar"
@@ -443,18 +445,23 @@ const styles = StyleSheet.create({
     height: 22,
   },
   restorationLabel: {
+    flex: 1,
     color: SV.surgicalWhite,
     fontSize: 14,
     fontWeight: '700',
-    marginBottom: 8,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   restorationCount: {
     color: SV.surgicalWhite,
     fontSize: 16,
     fontWeight: '700',
-    marginBottom: 10,
-    textAlign: 'center',
+    marginLeft: 10,
+    textAlign: 'right',
+  },
+  restorationHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   progressTrack: {
     width: '100%',
