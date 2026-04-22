@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 
+import { stareRowStackPullDp } from '@/src/game/stareMeshOverlap';
 import { SV } from '@/src/theme/skelevigil';
 
 const ROWS = 7;
@@ -15,30 +16,10 @@ const DIAMOND_CYAN = SV.neonCyan;
 /** Neural strand cells — brighter than field diamonds for memorization contrast. */
 const NEURAL_STRAND_BORDER_ICY = '#B8FFFF';
 /**
- * Half a column pitch for brick stagger. `translateX` draws past layout width — row stays
- * overflow:visible so the 5th diamond is not clipped.
- */
-const STAGGER_SHIFT = '9%';
-
-/**
- * Vertical nudge before rotate — pulls neighbors together at row seams.
- * Larger `VERT_NUDGE_DP` / nudge cap ⇒ thinner black between rows (watch clipping).
- */
-const VERT_NUDGE_DP = 38;
-/**
- * Applied as negative `marginTop` on rows 2…7 — larger value ⇒ stronger stack ⇒ less vertical gap.
- * Decreasing this widens row spacing (more black), not less.
- */
-const ROW_STACK_DP = 44;
-/**
- * Extra negative margin on rows 2,4,6 (0-based) for between-pair seams; same “larger = tighter” rule.
- */
-const BETWEEN_PAIRS_ROW_OVERLAP_DP = 78;
-/**
  * ~max inscribed rotated square in cell — drives “hairline” black inside each tile.
  * If tips clip, lower to ~0.992 before touching stack/nudge.
  */
-const DIAMOND_SIDE_FIT = 0.997;
+const DIAMOND_SIDE_FIT = 0.82;
 /** Teal frame inset inside the aspect outer (`margin` on `playBoxFace`). */
 const BORDER_VERTICAL_INSET_DP = 34;
 /** Inside-face bleed — match `StareRevealBoard` so phase art doesn’t clip diamond tips. */
@@ -62,6 +43,7 @@ export function StareDiamondPlayBox({
 }: Props) {
   const measuredRef = useRef(false);
   const [diamondSidePx, setDiamondSidePx] = useState<number | null>(null);
+  const [staggerShiftPx, setStaggerShiftPx] = useState(0);
 
   /** One measurement: all rows share cell geometry; width-% diamonds can exceed cell height and clip. */
   const onRowInnerLayout = useCallback((e: LayoutChangeEvent) => {
@@ -73,6 +55,7 @@ export function StareDiamondPlayBox({
     const cellH = height;
     const side = (Math.min(cellW, cellH) / Math.SQRT2) * DIAMOND_SIDE_FIT;
     setDiamondSidePx(side);
+    setStaggerShiftPx(Math.max(0, Math.round((cellW / 2) * 1000) / 1000));
   }, []);
 
   return (
@@ -85,30 +68,23 @@ export function StareDiamondPlayBox({
         <View style={styles.field} collapsable={false}>
         {Array.from({ length: ROWS }, (_, row) => {
           const stagger = row % 2 === 1;
-          const betweenPairs = row >= 2 && row % 2 === 0 && row < ROWS - 1;
-          const baseNudgeY =
-            diamondSidePx == null
-              ? 0
-              : (row % 2 === 0 ? 1 : -1) *
-                  Math.min(VERT_NUDGE_DP, diamondSidePx * 0.55);
-          const nudgeY = row === ROWS - 1 ? 0 : baseNudgeY;
+          const stackPullDp = stareRowStackPullDp(row, null);
+          const nudgeY = 0;
           return (
             <View
               key={row}
               style={[
                 styles.row,
                 row > 0 && {
-                  marginTop: -(
-                    ROW_STACK_DP +
-                    (betweenPairs ? BETWEEN_PAIRS_ROW_OVERLAP_DP : 0)
-                  ),
+                  transform: [{ translateY: -stackPullDp }],
+                  zIndex: row,
                 },
               ]}>
               <View
                 onLayout={onRowInnerLayout}
                 style={[
                   styles.rowInner,
-                  stagger && { transform: [{ translateX: STAGGER_SHIFT }] },
+                  stagger && staggerShiftPx > 0 && { transform: [{ translateX: staggerShiftPx }] },
                 ]}>
                 {Array.from({ length: COLS }, (_, col) => {
                   const key = row * COLS + col;

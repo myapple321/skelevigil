@@ -1,6 +1,7 @@
 import { Animated, Easing, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { stareRowStackPullDp } from '@/src/game/stareMeshOverlap';
 import { SV } from '@/src/theme/skelevigil';
 
 const ROWS = 7;
@@ -12,11 +13,8 @@ const FIELD_BLACK = '#121212';
 /** Non-neural lattice fill (teal) — play phase only; memorize matches Glimpse (strand only, no solid field). */
 const DIAMOND_CYAN = SV.neonCyan;
 const NEURAL_STRAND_BORDER_ICY = '#B8FFFF';
-const STAGGER_SHIFT = '9%';
-const VERT_NUDGE_DP = 38;
-const ROW_STACK_DP = 44;
-const BETWEEN_PAIRS_ROW_OVERLAP_DP = 78;
-const DIAMOND_SIDE_FIT = 0.997;
+/** < 1 leaves hairline gutters; at ~1 the rotated square’s bbox fills the cell and neighbors collide. */
+const DIAMOND_SIDE_FIT = 0.82;
 /** Teal frame sits inside the aspect box via vertical margin (same inset as the old absolute face). */
 const BORDER_VERTICAL_INSET_DP = 12;
 /**
@@ -26,7 +24,7 @@ const BORDER_VERTICAL_INSET_DP = 12;
 const FIELD_MESH_TOP_BLEED_DP = 36;
 const FIELD_MESH_BOTTOM_BLEED_DP = 26;
 /** Min gap between flex columns (pt). Avoid ~0 values — tiny `gap` breaks column widths on some RN builds. */
-const ROW_GAP = 1;
+const ROW_GAP = 2;
 
 type Props = {
   borderColor: string;
@@ -60,6 +58,8 @@ export function StareRevealBoard({
   onRevealCell,
 }: Props) {
   const [diamondSidePx, setDiamondSidePx] = useState<number | null>(null);
+  /** Half a column width (px) for odd-row brick stagger — `%` translateX used the wrong box and mis-shifted rows. */
+  const [staggerShiftPx, setStaggerShiftPx] = useState(0);
   const [fieldHeight, setFieldHeight] = useState(0);
 
   const failAnim = useFailAnim(failedIndex);
@@ -81,6 +81,7 @@ export function StareRevealBoard({
     const cellH = height;
     const side = (Math.min(cellW, cellH) / Math.SQRT2) * DIAMOND_SIDE_FIT;
     setDiamondSidePx(side);
+    setStaggerShiftPx(Math.max(0, Math.round((cellW / 2) * 1000) / 1000));
   }, []);
 
   const onFieldLayout = useCallback((e: LayoutChangeEvent) => {
@@ -99,28 +100,26 @@ export function StareRevealBoard({
         <View style={styles.playField} pointerEvents="box-none">
           <View collapsable={false} style={styles.meshRowsWrap}>
           {Array.from({ length: ROWS }, (_, row) => {
-            const isLastRow = row === ROWS - 1;
             const stagger = row % 2 === 1;
-            /** Extra overlap at even row seams (was tuned for 10 rows). Last row index is odd on 10×5, even on 7×5 — skip extra pull on final row. */
-            const betweenPairs = row >= 2 && row % 2 === 0 && row < ROWS - 1;
-            const baseNudgeY =
-              diamondSidePx == null
-                ? 0
-                : (row % 2 === 0 ? 1 : -1) * Math.min(VERT_NUDGE_DP, diamondSidePx * 0.55);
-            /** Last row: no downward nudge — avoids painting past the bottom inner edge. */
-            const nudgeY = isLastRow ? 0 : baseNudgeY;
+            const stackPullDp = stareRowStackPullDp(row, null);
+            /** Per-diamond seam nudge disabled — combined with row flex it read as diagonal pile-up. */
+            const nudgeY = 0;
             return (
               <View
                 key={row}
                 style={[
                   styles.row,
                   row > 0 && {
-                    marginTop: -(ROW_STACK_DP + (betweenPairs ? BETWEEN_PAIRS_ROW_OVERLAP_DP : 0)),
+                    transform: [{ translateY: -stackPullDp }],
+                    zIndex: row,
                   },
                 ]}>
                 <View
                   onLayout={onRowInnerLayout}
-                  style={[styles.rowInner, stagger && { transform: [{ translateX: STAGGER_SHIFT }] }]}>
+                  style={[
+                    styles.rowInner,
+                    stagger && staggerShiftPx > 0 && { transform: [{ translateX: staggerShiftPx }] },
+                  ]}>
                   {Array.from({ length: COLS }, (_, col) => {
                     const idx = row * COLS + col;
                     const isNeural = neuralTileIndices.has(idx);
