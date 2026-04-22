@@ -73,7 +73,10 @@ type VaultProgressContextValue = {
   recordGlimpseSuccess: () => void;
   recordMissionSuccess: (tier: keyof VaultAttemptsLeft) => void;
   recordGlimpseFailure: () => void;
-  recordMissionFailure: (tier: keyof VaultAttemptsLeft) => void;
+  recordMissionFailure: (
+    tier: keyof VaultAttemptsLeft,
+    options?: { debitReserve?: boolean },
+  ) => void;
   deductGlimpseAttempt: () => void;
   deductVaultAttempt: (tier: keyof VaultAttemptsLeft) => void;
   /** Debug / future post-purchase: +3 reserves for the chosen phase (Firestore or local). */
@@ -187,8 +190,13 @@ export function VaultProgressProvider({ children }: { children: ReactNode }) {
   }, [recordMissionSuccess]);
 
   const recordMissionFailure = useCallback(
-    (tier: keyof VaultAttemptsLeft) => {
+    (
+      tier: keyof VaultAttemptsLeft,
+      options?: { debitReserve?: boolean },
+    ) => {
+      const shouldDebitReserve = options?.debitReserve !== false;
       updateMetricsOnly((prev) => nextVaultMetricsAfterMission(prev, tier, false));
+      if (!shouldDebitReserve) return;
       if (firestoreUid) {
         void (async () => {
           try {

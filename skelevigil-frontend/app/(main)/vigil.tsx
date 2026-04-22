@@ -312,11 +312,9 @@ export default function VigilScreen() {
     outcomeCommittedRef.current = true;
     setHasActiveRound(false);
     lastRoundConsumedReserveRef.current = true;
-    if (paidForCurrentRoundRef.current) {
-      paidForCurrentRoundRef.current = false;
-    } else {
-      recordMissionFailure(vaultTier);
-    }
+    const paidRound = paidForCurrentRoundRef.current;
+    paidForCurrentRoundRef.current = false;
+    recordMissionFailure(vaultTier, { debitReserve: !paidRound });
   };
 
   useEffect(() => {
