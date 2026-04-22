@@ -13,6 +13,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 
 import { GlimpseBlockGrid } from '@/src/components/game/GlimpseBlockGrid';
+import { StareDiamondPlayBox } from '@/src/components/game/StareDiamondPlayBox';
 import {
   GLIMPSE_HELP_HINT,
   GLIMPSE_HELP_SUMMARY,
@@ -73,7 +74,7 @@ function PhaseBriefingBody({ phase }: { phase: PhaseInfoId }) {
               must navigate both layers:
             </Text>
             <Text style={[styles.modalSectionBody, styles.modalBullet]}>
-              Top Plane: 50 Teal Diamonds.
+              Top Plane: 35 Teal Diamonds (7×5 lattice).
             </Text>
             <Text style={[styles.modalSectionBody, styles.modalBullet]}>
               Bottom Plane: 50 Amber Hexagons.
@@ -94,6 +95,8 @@ function PhaseBriefingBody({ phase }: { phase: PhaseInfoId }) {
 }
 
 const ART_SIZE = 132;
+/** Stare board outer width so 5:7 aspect height fits the square art tile (7 rows × 5 cols). */
+const STARE_PHASE_PREVIEW_BOARD_W = Math.round((ART_SIZE * 5) / 7);
 
 /** Phase CTA fills — distinct from the default neon cyan tab chrome. */
 const PHASE_BTN = {
@@ -107,18 +110,20 @@ function GlimpsePhasesPreview() {
   return <GlimpseBlockGrid colors={colors} size={ART_SIZE} />;
 }
 
-const STARE_DIAMOND_ART = require('../../assets/phase-stare-diamond.png');
 /** Luminance-mapped to amber (see assets); avoids RN tintColor flattening the hex grid. */
 const TRANCE_HEXAGON_ART = require('../../assets/phase-trance-hexagon-amber.png');
 
-/** Diamond lattice preview for The Stare (matches 5×7 diamond briefing). */
+/** Live 7×5 diamond lattice (same as Vigil) inside the Phases art tile. */
 function StarePhasePreview() {
   return (
     <View
-      style={[styles.artFrame, styles.phasePreviewArtFrame]}
+      style={[styles.artFrame, styles.phasePreviewArtFrame, styles.starePhasePreviewRoot]}
       accessibilityRole="image"
       accessibilityLabel="Cyan diamond pattern preview for The Stare phase">
-      <Image source={STARE_DIAMOND_ART} style={styles.phasePreviewArtImage} resizeMode="cover" />
+      <StareDiamondPlayBox
+        borderColor={PHASE_ACCENTS.stare.primary}
+        previewWidth={STARE_PHASE_PREVIEW_BOARD_W}
+      />
     </View>
   );
 }
@@ -134,11 +139,12 @@ function TrancePhasePreview() {
       accessibilityRole="image"
       accessibilityLabel="Dual-plane Trance preview: diamond layer with hex grid stacked and offset downward">
       <View style={styles.tranceDualPlaneColumn}>
-        <Image
-          source={STARE_DIAMOND_ART}
-          style={styles.tranceDualPlaneLayer}
-          resizeMode="cover"
-        />
+        <View style={[styles.tranceDualPlaneLayer, styles.tranceDiamondPlaneRoot]}>
+          <StareDiamondPlayBox
+            borderColor={PHASE_ACCENTS.stare.primary}
+            previewWidth={STARE_PHASE_PREVIEW_BOARD_W}
+          />
+        </View>
         <Image
           source={TRANCE_HEXAGON_ART}
           style={[styles.tranceDualPlaneLayer, styles.tranceHexOverlay]}
@@ -387,9 +393,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(136,136,136,0.45)',
   },
-  phasePreviewArtImage: {
-    width: ART_SIZE,
-    height: ART_SIZE,
+  starePhasePreviewRoot: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   /** Full tile width: hex asset is margin-trimmed so honeycomb and diamond cover align under `cover`. */
   tranceDualPlaneColumn: {
@@ -406,6 +412,10 @@ const styles = StyleSheet.create({
     left: 0,
     width: '100%',
     height: ART_SIZE,
+  },
+  tranceDiamondPlaneRoot: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   /** Hex plane shifted down by ⅓ tile height (clips at column edge). */
   tranceHexOverlay: {

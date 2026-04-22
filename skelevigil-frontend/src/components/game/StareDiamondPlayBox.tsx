@@ -31,6 +31,11 @@ type Props = {
   borderColor: string;
   /** Tile indices (0–34, row-major top→bottom) that belong to the neural strand. */
   neuralTileIndices?: ReadonlySet<number>;
+  /**
+   * Fixed outer width for small tiles (e.g. Phases `ART_SIZE` square). Height follows `5:7` aspect.
+   * Tighter face/mesh padding so seven rows stay readable.
+   */
+  previewWidth?: number;
 };
 
 /**
@@ -40,10 +45,15 @@ type Props = {
 export function StareDiamondPlayBox({
   borderColor,
   neuralTileIndices,
+  previewWidth,
 }: Props) {
   const measuredRef = useRef(false);
   const [diamondSidePx, setDiamondSidePx] = useState<number | null>(null);
   const [staggerShiftPx, setStaggerShiftPx] = useState(0);
+  const isPreview = previewWidth != null;
+  const faceMarginV = isPreview ? 6 : BORDER_VERTICAL_INSET_DP;
+  const fieldPadTop = isPreview ? 6 : FIELD_MESH_TOP_BLEED_DP;
+  const fieldPadBottom = isPreview ? 6 : FIELD_MESH_BOTTOM_BLEED_DP;
 
   /** One measurement: all rows share cell geometry; width-% diamonds can exceed cell height and clip. */
   const onRowInnerLayout = useCallback((e: LayoutChangeEvent) => {
@@ -60,12 +70,23 @@ export function StareDiamondPlayBox({
 
   return (
     <View
-      style={styles.playBoxOuter}
+      style={[
+        styles.playBoxOuter,
+        isPreview && {
+          width: previewWidth,
+          maxWidth: previewWidth,
+          alignSelf: 'center',
+        },
+      ]}
       collapsable={false}
       accessibilityRole="image"
       accessibilityLabel="Stare play grid, thirty-five diamond tiles, staggered rows">
-      <View style={[styles.playBoxFace, { borderColor }]} collapsable={false}>
-        <View style={styles.field} collapsable={false}>
+      <View
+        style={[styles.playBoxFace, { borderColor, marginVertical: faceMarginV }]}
+        collapsable={false}>
+        <View
+          style={[styles.field, { paddingTop: fieldPadTop, paddingBottom: fieldPadBottom }]}
+          collapsable={false}>
         {Array.from({ length: ROWS }, (_, row) => {
           const stagger = row % 2 === 1;
           const stackPullDp = stareRowStackPullDp(row, null);
@@ -136,7 +157,6 @@ const styles = StyleSheet.create({
   },
   playBoxFace: {
     flex: 1,
-    marginVertical: BORDER_VERTICAL_INSET_DP,
     borderWidth: 3,
     borderRadius: 10,
     backgroundColor: FIELD_BLACK,
@@ -151,8 +171,6 @@ const styles = StyleSheet.create({
      * ~12% is usually enough vs 9% shift + rotated corners — raise if the 5th diamond clips.
      */
     paddingRight: '12%',
-    paddingTop: FIELD_MESH_TOP_BLEED_DP,
-    paddingBottom: FIELD_MESH_BOTTOM_BLEED_DP,
     backgroundColor: 'transparent',
     overflow: 'visible',
   },
