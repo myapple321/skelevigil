@@ -14,18 +14,17 @@ import { useRouter } from 'expo-router';
 
 import { GlimpseBlockGrid } from '@/src/components/game/GlimpseBlockGrid';
 import { StareDiamondPlayBox } from '@/src/components/game/StareDiamondPlayBox';
-import {
-  GLIMPSE_HELP_HINT,
-  GLIMPSE_HELP_SUMMARY,
-} from '@/src/content/glimpsePhaseHelp';
 import { buildGlimpseGreyPalette } from '@/src/game/glimpsePalette';
 import { PHASE_ACCENTS } from '@/src/theme/phaseAccents';
 import { SV } from '@/src/theme/skelevigil';
 
-const BRIEFING_INTRO =
-  'Tap for a briefing on how to navigate the Hidden Path and secure the Strand.';
-
 type PhaseInfoId = 'glimpse' | 'stare' | 'trance';
+
+const PHASE_FIELD_MANUAL_TITLE: Record<PhaseInfoId, string> = {
+  glimpse: 'The Glimpse - Field Manual',
+  stare: 'The Stare - Field Manual',
+  trance: 'The Trance - Field Manual',
+};
 
 function BriefSection({ label, body }: { label: string; body: string }) {
   return (
@@ -39,55 +38,63 @@ function BriefSection({ label, body }: { label: string; body: string }) {
 function PhaseBriefingBody({ phase }: { phase: PhaseInfoId }) {
   return (
     <>
-      <Text style={styles.modalIntro}>{BRIEFING_INTRO}</Text>
+      <Text style={styles.modalTitle}>{PHASE_FIELD_MANUAL_TITLE[phase]}</Text>
       {phase === 'glimpse' ? (
         <>
-          <BriefSection label="Geometry" body="5×5 Square Grid." />
+          <BriefSection label="The Geometry" body="5x5 Square Grid." />
           <BriefSection
-            label="Objective"
-            body="Memorize the path, then excavate the 25 surrounding blocks."
+            label="The Objective"
+            body="Successfully excavate the neutral blocks positioned around the main neural strands."
           />
-          <BriefSection label="Summary" body={GLIMPSE_HELP_SUMMARY} />
-          <BriefSection label="Hint" body={GLIMPSE_HELP_HINT} />
+          <BriefSection
+            label="The Hazard"
+            body="Do NOT touch the Neural Strands themselves. Contact will result in a Shattered Strand failure."
+          />
+          <BriefSection
+            label="Validation"
+            body='Once the surrounding excavation is complete, tap "Finish Excavation" to scan. If the strands are untouched, the mission is Secured.'
+          />
         </>
       ) : null}
       {phase === 'stare' ? (
         <>
-          <BriefSection label="Geometry" body="5×7 Diamond Grid." />
+          <BriefSection label="The Geometry" body="5x7 Diamond Grid." />
           <BriefSection
-            label="Objective"
-            body="Navigate 35 complex shapes in a high-saturation environment."
+            label="The Objective"
+            body="Successfully excavate the neutral blocks positioned around the main neural strands."
           />
           <BriefSection
-            label="Summary"
-            body="The grid has shifted to Diamonds. With 35 units to scan, your focus must remain steady. Uncover the empty space while keeping the Hidden Path untouched."
+            label="The Hazard"
+            body="Do NOT touch the Neural Strands themselves. Contact will result in a Shattered Strand failure."
+          />
+          <BriefSection
+            label="Validation"
+            body='Once the surrounding excavation is complete, tap "Finish Excavation" to scan. If the strands are untouched, the mission is Secured.'
           />
         </>
       ) : null}
       {phase === 'trance' ? (
         <>
-          <BriefSection label="Geometry" body="Dual-Plato Stacking (Two layers)." />
-          <View style={styles.modalSection}>
-            <Text style={styles.modalSectionLabel}>Summary</Text>
-            <Text style={styles.modalSectionBody}>
-              You are now managing two planes of reality simultaneously. To secure the mission, you
-              must navigate both layers:
-            </Text>
-            <Text style={[styles.modalSectionBody, styles.modalBullet]}>
-              Top Plane: 35 Teal Diamonds (7×5 lattice).
-            </Text>
-            <Text style={[styles.modalSectionBody, styles.modalBullet]}>
-              Bottom Plane: 50 Amber Hexagons.
-            </Text>
-          </View>
-          <View style={styles.modalSection}>
-            <Text style={styles.modalSectionLabel}>Hint</Text>
-            <Text style={styles.modalSectionBody}>
-              Carefully clear the surrounding tiles on both levels. The Immutable Strand now vibrates
-              across two frequencies; if either plane is disturbed, the mission will end. Tap [Finish Excavation]
-              once both architectures are secure.
-            </Text>
-          </View>
+          <BriefSection
+            label="The Geometry"
+            body="Dual-Plato Stacking (Two layers), 5x7 Diamond Bottom Grid and 5x7 Hexagon Top Grid."
+          />
+          <BriefSection
+            label="The Observation"
+            body="You have 5 seconds per plane (Diamond and Hexagon) to memorize the locations of the Neural Nexus blocks."
+          />
+          <BriefSection
+            label="The Objective"
+            body="You must manually excavate all identified Nexus blocks across both planes within the 70-second window."
+          />
+          <BriefSection
+            label="The Pivot"
+            body="Use the shared Nexus blocks to transition your focus between the two geometric layers."
+          />
+          <BriefSection
+            label="Validation"
+            body='Tap "Finish Excavation" once all target nodes are cleared to scan for mission completion.'
+          />
         </>
       ) : null}
     </>
@@ -475,13 +482,13 @@ const styles = StyleSheet.create({
   modalScrollContent: {
     paddingBottom: 4,
   },
-  modalIntro: {
+  modalTitle: {
     color: SV.surgicalWhite,
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 16,
+    lineHeight: 22,
     textAlign: 'center',
     marginBottom: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   modalSection: {
     marginBottom: 14,
