@@ -26,12 +26,14 @@ import { playTileFailSfx } from '@/src/audio/tileFailSfx';
 import { playTileRevealSfx } from '@/src/audio/tileRevealSfx';
 import { GlimpseRevealBoard } from '@/src/components/game/GlimpseRevealBoard';
 import { StareRevealBoard } from '@/src/components/game/StareRevealBoard';
+import { TranceHexagonGrid, type TranceHexStatus } from '@/src/components/game/TranceHexagonGrid';
 import { GLIMPSE_HELP_HINT, GLIMPSE_HELP_SUMMARY } from '@/src/content/glimpsePhaseHelp';
 import { useSfxPreference } from '@/src/contexts/SfxPreferenceContext';
 import { useSessionSecurity } from '@/src/contexts/SessionSecurityContext';
 import { useVaultProgress } from '@/src/contexts/VaultProgressContext';
 import { shuffledGlimpseGreyPalette } from '@/src/game/glimpsePalette';
 import { shuffledStareGreyPalette } from '@/src/game/starePalette';
+import { shuffledTranceAmberPalette } from '@/src/game/trancePalette';
 import { generateRandomNeuralBlocks, neuralBlockToTileIndex } from '@/src/game/neuralBlocks';
 import {
   generateRandomStareNeuralBlocks,
@@ -48,6 +50,7 @@ const SCAN_MS = 2000;
 const GLIMPSE_PLAY_TIME_SEC = 25;
 /** Stare mission clock (seconds) — matches 7×5 (35-tile) board; longer than Glimpse. */
 const STARE_PLAY_TIME_SEC = 35;
+const TRANCE_PLAY_TIME_SEC = 70;
 const TIMEOUT_AMBER = '#FFBF00';
 
 /**
@@ -65,6 +68,17 @@ const MAIN_TAB_BAR_STYLE = {
  * Set when the Vigil tab blurs; consumed on next focus to enter `paused` (survives screen remount).
  */
 let vigilPausedAfterNextTabFocus = false;
+
+function buildRandomTranceStatuses(activeCount: number): TranceHexStatus[] {
+  const total = 35;
+  const pool = Array.from({ length: total }, (_, idx) => idx);
+  for (let i = pool.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j]!, pool[i]!];
+  }
+  const activeSet = new Set(pool.slice(0, Math.max(0, Math.min(activeCount, total))));
+  return Array.from({ length: total }, (_, idx) => (activeSet.has(idx) ? 'active' : 'future'));
+}
 
 export default function VigilScreen() {
   const navigation = useNavigation();
@@ -115,6 +129,17 @@ export default function VigilScreen() {
   const [hasActiveRound, setHasActiveRound] = useState(false);
   /** Stare / Trance placeholder: sortie open until Finish Excavation. */
   const [placeholderRoundOpen, setPlaceholderRoundOpen] = useState(false);
+  const [trancePhase, setTrancePhase] = useState<'idle' | 'memorize' | 'play'>('idle');
+  const [tranceStatuses, setTranceStatuses] = useState<TranceHexStatus[]>(() =>
+    Array.from({ length: 35 }, () => 'future'),
+  );
+  const [tranceSecondsLeft, setTranceSecondsLeft] = useState(TRANCE_PLAY_TIME_SEC);
+  const [tranceMemorizeLeft, setTranceMemorizeLeft] = useState(5);
+  const tranceActiveSetRef = useRef<Set<number>>(new Set());
+  const tranceRevealedSetRef = useRef<Set<number>>(new Set());
+  const tranceTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tranceMemorizeTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tranceMemorizeDoneRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [infoModal, setInfoModal] = useState<{ title: string; body: string } | null>(null);
 
   const missionSuccessOpenRef = useRef(missionSuccessModalVisible);
@@ -124,6 +149,7 @@ export default function VigilScreen() {
 
   const [gridColors, setGridColors] = useState(() => shuffledGlimpseGreyPalette());
   const [stareGridColors, setStareGridColors] = useState(() => shuffledStareGreyPalette());
+  const [tranceFieldColors, setTranceFieldColors] = useState(() => shuffledTranceAmberPalette());
   const [revealed, setRevealed] = useState<boolean[]>(() =>
     Array.from({ length: 25 }, () => false),
   );
@@ -285,6 +311,24 @@ export default function VigilScreen() {
 
   useEffect(() => {
     setPlaceholderRoundOpen(false);
+    setTrancePhase('idle');
+    setTranceStatuses(Array.from({ length: 35 }, () => 'future'));
+    setTranceSecondsLeft(TRANCE_PLAY_TIME_SEC);
+    setTranceMemorizeLeft(5);
+    tranceActiveSetRef.current = new Set();
+    tranceRevealedSetRef.current = new Set();
+    if (tranceTimerRef.current) {
+      clearInterval(tranceTimerRef.current);
+      tranceTimerRef.current = null;
+    }
+    if (tranceMemorizeTickRef.current) {
+      clearInterval(tranceMemorizeTickRef.current);
+      tranceMemorizeTickRef.current = null;
+    }
+    if (tranceMemorizeDoneRef.current) {
+      clearTimeout(tranceMemorizeDoneRef.current);
+      tranceMemorizeDoneRef.current = null;
+    }
   }, [vigilPhase]);
 
   useEffect(() => {
@@ -575,12 +619,103 @@ export default function VigilScreen() {
     }
     deductVaultAttempt(vaultTier);
     setPlaceholderRoundOpen(true);
+    setTrancePhase('memorize');
+    setTranceMemorizeLeft(5);
+    setTranceSecondsLeft(TRANCE_PLAY_TIME_SEC);
+    setTranceFieldColors(shuffledTranceAmberPalette());
+    const fresh = buildRandomTranceStatuses(10);
+    setTranceStatuses(fresh);
+    tranceActiveSetRef.current = new Set(
+      fresh.map((status, idx) => (status === 'active' ? idx : -1)).filter((idx) => idx >= 0),
+    );
+    tranceRevealedSetRef.current = new Set();
+    if (tranceTimerRef.current) {
+      clearInterval(tranceTimerRef.current);
+      tranceTimerRef.current = null;
+    }
+    if (tranceMemorizeTickRef.current) clearInterval(tranceMemorizeTickRef.current);
+    if (tranceMemorizeDoneRef.current) clearTimeout(tranceMemorizeDoneRef.current);
+    tranceMemorizeTickRef.current = setInterval(() => {
+      setTranceMemorizeLeft((s) => (s <= 1 ? 0 : s - 1));
+    }, 1000);
+    tranceMemorizeDoneRef.current = setTimeout(() => {
+      if (tranceMemorizeTickRef.current) {
+        clearInterval(tranceMemorizeTickRef.current);
+        tranceMemorizeTickRef.current = null;
+      }
+      setTrancePhase('play');
+      setTranceStatuses(Array.from({ length: 35 }, () => 'future'));
+      tranceTimerRef.current = setInterval(() => {
+        setTranceSecondsLeft((s) => {
+          if (s <= 1) {
+            if (tranceTimerRef.current) {
+              clearInterval(tranceTimerRef.current);
+              tranceTimerRef.current = null;
+            }
+            setPlaceholderRoundOpen(false);
+            setTrancePhase('idle');
+            return 0;
+          }
+          return s - 1;
+        });
+      }, 1000);
+    }, 5000);
   }, [deductVaultAttempt, placeholderLocked, vaultTier]);
 
   const onPlaceholderFinishExcavation = useCallback(() => {
     if (!placeholderRoundOpen) return;
     setPlaceholderRoundOpen(false);
+    setTrancePhase('idle');
+    if (tranceTimerRef.current) {
+      clearInterval(tranceTimerRef.current);
+      tranceTimerRef.current = null;
+    }
+    if (tranceMemorizeTickRef.current) {
+      clearInterval(tranceMemorizeTickRef.current);
+      tranceMemorizeTickRef.current = null;
+    }
+    if (tranceMemorizeDoneRef.current) {
+      clearTimeout(tranceMemorizeDoneRef.current);
+      tranceMemorizeDoneRef.current = null;
+    }
   }, [placeholderRoundOpen]);
+
+  const onTrancePressCell = useCallback(
+    (index: number) => {
+      if (trancePhase !== 'play' || !placeholderRoundOpen) return;
+      const isTarget = tranceActiveSetRef.current.has(index);
+      setTranceStatuses((prev) => {
+        const next = [...prev];
+        if (isTarget) {
+          next[index] = 'active';
+          tranceRevealedSetRef.current.add(index);
+        } else {
+          next[index] = 'shattered';
+        }
+        return next;
+      });
+      if (!isTarget) {
+        setPlaceholderRoundOpen(false);
+        setTrancePhase('idle');
+        if (tranceTimerRef.current) {
+          clearInterval(tranceTimerRef.current);
+          tranceTimerRef.current = null;
+        }
+        return;
+      }
+      const activeSize = tranceActiveSetRef.current.size;
+      const revealedSize = tranceRevealedSetRef.current.size;
+      if (activeSize > 0 && revealedSize >= activeSize) {
+        setPlaceholderRoundOpen(false);
+        setTrancePhase('idle');
+        if (tranceTimerRef.current) {
+          clearInterval(tranceTimerRef.current);
+          tranceTimerRef.current = null;
+        }
+      }
+    },
+    [placeholderRoundOpen, trancePhase],
+  );
 
   const placeholderFinishDisabled = !placeholderRoundOpen;
 
@@ -887,16 +1022,22 @@ export default function VigilScreen() {
               </Text>
             ) : (
               <Text style={styles.tabReturnHint} accessibilityLiveRegion="polite">
-                {placeholderRoundOpen
-                  ? 'Placeholder grid — excavation gameplay will connect here in a future update.'
-                  : 'Tap New Mission to begin a sortie. This panel is a stand-in until dual-plane Trance gameplay ships.'}
+                {trancePhase === 'memorize'
+                  ? `Memorize the Nexus pattern. Hex layer collapses in ${tranceMemorizeLeft}s.`
+                  : trancePhase === 'play'
+                    ? `Excavate the remembered Nexus cells. ${tranceSecondsLeft}s remaining.`
+                    : 'Tap New Mission to begin a sortie on the Trance hex layer.'}
               </Text>
             )}
-            <View
-              style={[styles.placeholderVerticalBox, { borderColor: accent.primary }]}
-              accessibilityRole="none"
-              accessibilityLabel="Placeholder excavation grid for The Trance">
-              <Text style={styles.placeholderGridMeta}>Preview</Text>
+            <View style={styles.gridWrap}>
+              <TranceHexagonGrid
+                statuses={tranceStatuses}
+                onPressCell={trancePhase === 'play' ? onTrancePressCell : undefined}
+                disabled={trancePhase !== 'play'}
+                surface={trancePhase === 'play' ? 'field' : 'memory'}
+                fieldFills={tranceFieldColors}
+                label="Trance vigilance hex layer, seven by five"
+              />
             </View>
             <View style={styles.newGameRow}>
               <Pressable
@@ -954,7 +1095,7 @@ export default function VigilScreen() {
             </View>
             {vigilPhase === 'trance' ? (
               <Text style={styles.trancePlaceholderNote}>
-                Dual-plane (two stacked layers) layout will replace this placeholder.
+                Memory layer and play layer now share the same 7x5 hex grid.
               </Text>
             ) : null}
           </>
@@ -1226,25 +1367,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     textAlign: 'center',
-  },
-  /** Stand-in frame: width∶height = 5∶10 (kept as the agreed layout). */
-  placeholderVerticalBox: {
-    alignSelf: 'center',
-    width: '52%',
-    maxWidth: 220,
-    aspectRatio: 5 / 10,
-    borderWidth: 3,
-    borderRadius: 10,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 18,
-  },
-  placeholderGridMeta: {
-    color: SV.muted,
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 1,
   },
   trancePlaceholderNote: {
     color: SV.muted,
