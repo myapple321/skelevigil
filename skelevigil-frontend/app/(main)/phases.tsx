@@ -1,13 +1,5 @@
 import { useMemo, useState } from 'react';
-import {
-  Image,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
@@ -117,9 +109,6 @@ function GlimpsePhasesPreview() {
   return <GlimpseBlockGrid colors={colors} size={ART_SIZE} />;
 }
 
-/** Luminance-mapped to amber (see assets); avoids RN tintColor flattening the hex grid. */
-const TRANCE_HEXAGON_ART = require('../../assets/phase-trance-hexagon-amber.png');
-
 /** Live 7×5 diamond lattice (same as Vigil) inside the Phases art tile. */
 function StarePhasePreview() {
   return (
@@ -135,16 +124,19 @@ function StarePhasePreview() {
   );
 }
 
+/** Vigil Trance memorize capture (screenshot #2) — overlaid and shifted down over the Stare diamond. */
+const TRANCE_MEMORY_HEX_ART = require('../../assets/phase-trance-memory-hex-vigil.png');
+
 /**
- * Dual-plane preview for The Trance: diamond plane (rear) + hex plane (front), hex shifted down
- * by one-third of the tile so the top band shows the lower plane (Dual-Plato briefing).
+ * Dual-plane preview: full Stare diamond (same as Phases / screenshot #1) with the Vigil memory hex
+ * raster slid down so it covers the lower diamond field.
  */
 function TrancePhasePreview() {
   return (
     <View
-      style={[styles.artFrame, styles.phasePreviewArtFrame]}
+      style={[styles.artFrame, styles.phasePreviewArtFrame, styles.trancePhasePreviewRoot]}
       accessibilityRole="image"
-      accessibilityLabel="Dual-plane Trance preview: diamond layer with hex grid stacked and offset downward">
+      accessibilityLabel="Dual-plane Trance preview: Stare diamond base with hex memory layer shifted down over it">
       <View style={styles.tranceDualPlaneColumn}>
         <View style={[styles.tranceDualPlaneLayer, styles.tranceDiamondPlaneRoot]}>
           <StareDiamondPlayBox
@@ -153,8 +145,8 @@ function TrancePhasePreview() {
           />
         </View>
         <Image
-          source={TRANCE_HEXAGON_ART}
-          style={[styles.tranceDualPlaneLayer, styles.tranceHexOverlay]}
+          source={TRANCE_MEMORY_HEX_ART}
+          style={[styles.tranceDualPlaneLayer, styles.tranceHexMemoryOverlay]}
           resizeMode="cover"
         />
       </View>
@@ -404,7 +396,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  /** Full tile width: hex asset is margin-trimmed so honeycomb and diamond cover align under `cover`. */
+  trancePhasePreviewRoot: {
+    overflow: 'hidden',
+  },
   tranceDualPlaneColumn: {
     position: 'absolute',
     top: 0,
@@ -424,8 +418,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  /** Hex plane shifted down by ⅓ tile height (clips at column edge). */
-  tranceHexOverlay: {
+  /** Screenshot #2: translateY pulls the hex plate down over the bottom of the diamond lattice. */
+  tranceHexMemoryOverlay: {
     transform: [{ translateY: ART_SIZE / 3 }],
   },
   actionColumn: {
