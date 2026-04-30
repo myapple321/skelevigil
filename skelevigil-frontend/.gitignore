@@ -44,5 +44,5 @@ GoogleService-Info.plist
 *.tsbuildinfo
 
 # generated native folders
-/ios
+# ios/ is tracked so Xcode asset catalogs (AppIcon, splash imagesets) stay in git; see ios/.gitignore for Pods/build.
 /android

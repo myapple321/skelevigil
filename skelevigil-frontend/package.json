@@ -8,7 +8,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "generate:icon-master": "node scripts/generate-icon-master.mjs",
-    "generate:icon-master:vector": "node scripts/generate-icon-master-vector.mjs"
+    "generate:icon-master:vector": "node scripts/generate-icon-master-vector.mjs",
+    "sync:ios-assets": "bash scripts/sync-ios-asset-catalog.sh"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
