@@ -7,7 +7,7 @@ import {
 import { LEGAL_DOCUMENTS_LAST_UPDATED } from '@/src/legal/legalDocumentsMeta';
 import { Text } from 'react-native';
 
-export default function TermsOfServiceScreen() {
+export default function TermsOfUseScreen() {
   return (
     <LegalDocumentLayout title="Terms of Use" lastUpdated={LEGAL_DOCUMENTS_LAST_UPDATED}>
       <LegalBody>

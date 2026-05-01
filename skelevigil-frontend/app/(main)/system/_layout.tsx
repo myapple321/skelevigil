@@ -58,7 +58,7 @@ export default function SystemLayout() {
         }}
       />
       <Stack.Screen
-        name="terms-of-service"
+        name="terms-of-use"
         options={{
           title: 'Terms of Use',
           headerBackTitleVisible: false,
