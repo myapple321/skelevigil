@@ -90,8 +90,8 @@ export default function AboutSkeleVigilScreen() {
           onPress={() => router.push('/(main)/system/terms-of-service')}
           style={({ pressed }) => [styles.linkRow, pressed && styles.linkPressed]}
           accessibilityRole="link"
-          accessibilityLabel="Terms of Service">
-          <Text style={styles.linkText}>Terms of Service</Text>
+          accessibilityLabel="Terms of Use">
+          <Text style={styles.linkText}>Terms of Use</Text>
         </Pressable>
 
         <Text style={[styles.subheading, styles.contactHeading]}>Contact Us</Text>

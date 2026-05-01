@@ -3,16 +3,22 @@ import {
   LegalBullet,
   LegalDocumentLayout,
   LegalSectionTitle,
-  LegalSubheading,
 } from '@/src/components/LegalDocumentLayout';
 import { LEGAL_DOCUMENTS_LAST_UPDATED } from '@/src/legal/legalDocumentsMeta';
+import { Text } from 'react-native';
 
 export default function TermsOfServiceScreen() {
   return (
-    <LegalDocumentLayout title="Terms of Service" lastUpdated={LEGAL_DOCUMENTS_LAST_UPDATED}>
-      <LegalSubheading>Operational Agreement</LegalSubheading>
+    <LegalDocumentLayout title="Terms of Use" lastUpdated={LEGAL_DOCUMENTS_LAST_UPDATED}>
       <LegalBody>
-        By accessing the SkeleVigil interface, you agree to the following operational parameters.
+        <Text style={{ fontWeight: '700' }}>SkeleVigil</Text> (&quot;we,&quot; &quot;us,&quot; or
+        &quot;our&quot;) provides cognitive tools and neural excavation games designed to assist
+        users in maintaining mental vigilance and focus. By accessing or using the{' '}
+        <Text style={{ fontWeight: '700' }}>SkeleVigil</Text> application, you agree to these{' '}
+        <Text style={{ fontWeight: '700' }}>Terms of Use</Text> and all applicable laws and
+        regulations. You acknowledge that <Text style={{ fontWeight: '700' }}>SkeleVigil</Text> is
+        a cognitive exercise tool and does not provide medical advice or diagnosis. If you do not
+        agree to these terms, please discontinue use of the application.
       </LegalBody>
 
       <LegalSectionTitle>1. License to Use</LegalSectionTitle>

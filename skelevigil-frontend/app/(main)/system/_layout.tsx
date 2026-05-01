@@ -60,7 +60,7 @@ export default function SystemLayout() {
       <Stack.Screen
         name="terms-of-service"
         options={{
-          title: 'Terms of Service',
+          title: 'Terms of Use',
           headerBackTitleVisible: false,
           headerStyle: { backgroundColor: '#000000' },
           contentStyle: { backgroundColor: '#000000' },
